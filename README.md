@@ -65,9 +65,10 @@ FractiAI will do for AI what Pixar did for animation—pioneering a transformati
 
 • Documentation: Comprehensive guides for getting started and scaling applications.
 
-
+ 
 
 🌍 Join Us
+Check out technical documents on FractiAI on our Zenodo Repository at https://zenodo.org/records/14210128
 
 
 
