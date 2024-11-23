@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fractiai-api
+  namespace: fractiai
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: fractiai-api
+  template:
+    metadata:
+      labels:
+        app: fractiai-api
+    spec:
+      containers:
+      - name: fractiai-api
+        image: fractiai/api:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+      volumes:
+      - name: config-volume
+        configMap:
+          name: fractiai-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fractiai-api
+  namespace: fractiai
+spec:
+  selector:
+    app: fractiai-api
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: LoadBalancer 
