@@ -15,6 +15,7 @@ from collections import defaultdict
 from enum import Enum, auto
 import scipy.stats as stats
 import scipy.optimize as optimize
+import itertools
 
 from Methods.QuantumFieldMorphism import (
     QuantumFieldMorphism, FieldMorphismConfig,
@@ -171,6 +172,123 @@ class AdvancedMetrics:
             'economic_impact': float(economic_impact),
             'environmental_impact': float(environmental_impact),
             'overall_impact': float((economic_impact + environmental_impact) / 2)
+        }
+
+class QuantumFieldMetrics:
+    """Advanced quantum field theoretic metrics and analysis"""
+    
+    @staticmethod
+    def compute_entanglement_entropy(
+        state_a: np.ndarray,
+        state_b: np.ndarray,
+        partition_dims: Tuple[int, int]
+    ) -> float:
+        """Compute von Neumann entanglement entropy between two subsystems"""
+        # Construct density matrix
+        joint_state = np.outer(state_a, state_b)
+        density_matrix = joint_state @ joint_state.T
+        
+        # Partial trace over B
+        reduced_density = np.zeros((partition_dims[0], partition_dims[0]))
+        for i in range(partition_dims[1]):
+            slice_i = density_matrix[:partition_dims[0], i::partition_dims[1]]
+            reduced_density += slice_i
+            
+        # Compute eigenvalues
+        eigenvals = np.linalg.eigvalsh(reduced_density)
+        eigenvals = eigenvals[eigenvals > 1e-10]  # Remove numerical noise
+        
+        # Compute von Neumann entropy
+        return float(-np.sum(eigenvals * np.log2(eigenvals)))
+    
+    @staticmethod
+    def compute_path_integral(
+        initial_state: np.ndarray,
+        final_state: np.ndarray,
+        action: Callable[[np.ndarray], float],
+        num_paths: int = 1000
+    ) -> Tuple[float, np.ndarray]:
+        """Compute path integral between initial and final states"""
+        # Generate paths
+        time_steps = 20
+        paths = np.zeros((num_paths, time_steps, len(initial_state)))
+        
+        # Initialize paths
+        paths[:, 0] = initial_state
+        paths[:, -1] = final_state
+        
+        # Generate random paths with boundary conditions
+        for i in range(1, time_steps-1):
+            t = i / (time_steps - 1)
+            mean_state = (1 - t) * initial_state + t * final_state
+            paths[:, i] = mean_state + 0.1 * np.random.randn(num_paths, len(initial_state))
+            
+        # Compute action for each path
+        path_actions = np.array([
+            sum(action(path[t]) for t in range(time_steps))
+            for path in paths
+        ])
+        
+        # Compute weighted average
+        weights = np.exp(-path_actions)
+        weights /= np.sum(weights)
+        
+        expectation = np.sum(weights[:, np.newaxis, np.newaxis] * paths, axis=0)
+        
+        return float(np.mean(path_actions)), expectation
+    
+    @staticmethod
+    def detect_phase_transitions(
+        order_parameter: np.ndarray,
+        control_parameter: np.ndarray
+    ) -> List[Dict[str, float]]:
+        """Detect quantum phase transitions using order parameter behavior"""
+        # Compute derivatives
+        d_order = np.gradient(order_parameter)
+        d2_order = np.gradient(d_order)
+        
+        # Find potential transition points
+        transitions = []
+        for i in range(1, len(control_parameter)-1):
+            # Look for peaks in second derivative
+            if abs(d2_order[i]) > 2 * np.std(d2_order):
+                transitions.append({
+                    'position': float(control_parameter[i]),
+                    'strength': float(abs(d2_order[i])),
+                    'width': float(1 / abs(d_order[i]) if d_order[i] != 0 else np.inf)
+                })
+                
+        return transitions
+    
+    @staticmethod
+    def analyze_resonance_patterns(
+        field_states: List[np.ndarray],
+        frequencies: np.ndarray
+    ) -> Dict[str, Any]:
+        """Analyze quantum resonance patterns in field evolution"""
+        # Compute frequency domain representation
+        fourier_states = np.fft.fft(field_states, axis=0)
+        power_spectrum = np.abs(fourier_states) ** 2
+        
+        # Find dominant modes
+        dominant_freqs = frequencies[np.argmax(power_spectrum, axis=0)]
+        
+        # Compute coherence between modes
+        coherence_matrix = np.zeros((len(dominant_freqs), len(dominant_freqs)))
+        for i in range(len(dominant_freqs)):
+            for j in range(len(dominant_freqs)):
+                if i != j:
+                    coherence_matrix[i, j] = np.abs(
+                        np.corrcoef(
+                            fourier_states[:, i],
+                            fourier_states[:, j]
+                        )[0, 1]
+                    )
+        
+        return {
+            'dominant_frequencies': dominant_freqs.tolist(),
+            'mode_coherence': coherence_matrix.tolist(),
+            'spectral_power': np.mean(power_spectrum, axis=0).tolist()
         }
 
 class CaliforniaDomain:
@@ -535,6 +653,9 @@ class CaliforniaSimulation:
         self.intervention_history = []
         self.anomaly_history = []
         
+        # Add quantum field metrics
+        self.quantum_metrics = QuantumFieldMetrics()
+        
     def _initialize_analytics(self) -> None:
         """Initialize analytics tools"""
         self.metrics = AdvancedMetrics()
@@ -565,6 +686,13 @@ class CaliforniaSimulation:
         
         # Add anomaly detection
         analysis['anomalies'] = self._detect_anomalies()
+        
+        # Add quantum field theoretic analysis
+        analysis.update({
+            'quantum_metrics': self._analyze_quantum_properties(),
+            'field_evolution': self._analyze_field_evolution(),
+            'resonance_patterns': self._analyze_resonance_patterns()
+        })
         
         return analysis
         
@@ -762,6 +890,83 @@ class CaliforniaSimulation:
                 anomalies[domain.name] = domain_anomalies
                 
         return anomalies
+        
+    def _analyze_quantum_properties(self) -> Dict[str, Any]:
+        """Analyze quantum properties of the system"""
+        metrics = {}
+        
+        # Compute entanglement between domains
+        for domain1, domain2 in itertools.combinations(
+            [self.natural, self.government, self.technology, self.socioeconomic],
+            2
+        ):
+            entropy = self.quantum_metrics.compute_entanglement_entropy(
+                domain1.state,
+                domain2.state,
+                (len(domain1.state), len(domain2.state))
+            )
+            metrics[f'entanglement_{domain1.name}_{domain2.name}'] = entropy
+            
+        # Detect phase transitions
+        for domain in [self.natural, self.government, 
+                      self.technology, self.socioeconomic]:
+            if len(domain.state_history) > 2:
+                transitions = self.quantum_metrics.detect_phase_transitions(
+                    np.array([np.mean(state) for state in domain.state_history]),
+                    np.arange(len(domain.state_history))
+                )
+                metrics[f'phase_transitions_{domain.name}'] = transitions
+                
+        return metrics
+        
+    def _analyze_field_evolution(self) -> Dict[str, Any]:
+        """Analyze quantum field evolution"""
+        # Compute path integrals for each domain
+        field_metrics = {}
+        for domain in [self.natural, self.government, 
+                      self.technology, self.socioeconomic]:
+            if len(domain.state_history) > 1:
+                action_value, expected_path = self.quantum_metrics.compute_path_integral(
+                    domain.state_history[0],
+                    domain.state_history[-1],
+                    lambda x: np.sum(x**2)  # Simple quadratic action
+                )
+                field_metrics[domain.name] = {
+                    'action': float(action_value),
+                    'expected_path': expected_path.tolist()
+                }
+                
+        return field_metrics
+        
+    def _analyze_resonance_patterns(self) -> Dict[str, Any]:
+        """Analyze quantum resonance patterns"""
+        # Combine all field states
+        if not any(domain.state_history for domain in 
+                  [self.natural, self.government, 
+                   self.technology, self.socioeconomic]):
+            return {}
+            
+        # Compute frequencies
+        num_timesteps = len(next(
+            domain.state_history for domain in 
+            [self.natural, self.government, 
+             self.technology, self.socioeconomic]
+            if domain.state_history
+        ))
+        frequencies = np.fft.fftfreq(num_timesteps)
+        
+        # Analyze patterns for each domain
+        resonance_patterns = {}
+        for domain in [self.natural, self.government, 
+                      self.technology, self.socioeconomic]:
+            if domain.state_history:
+                patterns = self.quantum_metrics.analyze_resonance_patterns(
+                    domain.state_history,
+                    frequencies
+                )
+                resonance_patterns[domain.name] = patterns
+                
+        return resonance_patterns
 
 def create_simulation() -> CaliforniaSimulation:
     """Create and initialize an enhanced California simulation"""
