@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import logging
 from scipy.stats import entropy
 from Methods.FreeEnergyPrinciple import FreeEnergyMinimizer, FEPConfig
+from scipy.special import softmax
 
 logger = logging.getLogger(__name__)
 
@@ -329,3 +330,187 @@ class ActiveInferenceAgent:
             # Replace worst performing policy
             worst_idx = np.argmax([p.value for p in self.policies])
             self.policies[worst_idx] = successful_policy
+
+"""
+RecursiveMetaLearner: Implements hierarchical meta-learning through recursive
+pattern discovery and optimization.
+"""
+
+import numpy as np
+from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass
+import logging
+from scipy.stats import entropy
+from scipy.special import softmax
+
+logger = logging.getLogger(__name__)
+
+@dataclass
+class MetaLearnerConfig:
+    """Configuration for recursive meta-learning"""
+    max_depth: int = 5
+    pattern_dim: int = 64
+    learning_rate: float = 0.01
+    memory_size: int = 1000
+    batch_size: int = 32
+
+class RecursiveMetaLearner:
+    """Implements recursive meta-learning"""
+    
+    def __init__(self, config: MetaLearnerConfig):
+        self.config = config
+        self.pattern_hierarchy = {}
+        self.meta_patterns = {}
+        self.learning_history = []
+        
+    def learn_pattern(self, pattern: np.ndarray, depth: int = 0) -> Dict[str, Any]:
+        """Learn pattern at specified depth"""
+        if depth >= self.config.max_depth:
+            return {'pattern': pattern, 'depth': depth}
+            
+        # Store pattern at current depth
+        pattern_id = f"pattern_{depth}_{len(self.pattern_hierarchy)}"
+        self.pattern_hierarchy[pattern_id] = {
+            'pattern': pattern,
+            'depth': depth,
+            'children': [],
+            'meta_patterns': []
+        }
+        
+        # Extract sub-patterns
+        sub_patterns = self._extract_sub_patterns(pattern)
+        
+        # Recursively learn sub-patterns
+        child_results = []
+        for sub_pattern in sub_patterns:
+            child_result = self.learn_pattern(sub_pattern, depth + 1)
+            if child_result:
+                self.pattern_hierarchy[pattern_id]['children'].append(
+                    child_result['pattern_id']
+                )
+                child_results.append(child_result)
+                
+        # Generate meta-pattern
+        if child_results:
+            meta_pattern = self._generate_meta_pattern(child_results)
+            meta_pattern_id = f"meta_{pattern_id}"
+            self.meta_patterns[meta_pattern_id] = {
+                'pattern': meta_pattern,
+                'source_patterns': [r['pattern_id'] for r in child_results],
+                'depth': depth
+            }
+            self.pattern_hierarchy[pattern_id]['meta_patterns'].append(
+                meta_pattern_id
+            )
+            
+        # Store learning experience
+        experience = {
+            'pattern_id': pattern_id,
+            'depth': depth,
+            'child_results': child_results,
+            'meta_pattern_id': meta_pattern_id if child_results else None
+        }
+        self.learning_history.append(experience)
+        
+        return experience
+        
+    def _extract_sub_patterns(self, pattern: np.ndarray) -> List[np.ndarray]:
+        """Extract sub-patterns from pattern"""
+        sub_patterns = []
+        
+        # Split pattern into segments
+        segment_size = len(pattern) // 2
+        for i in range(0, len(pattern) - segment_size + 1, segment_size // 2):
+            sub_pattern = pattern[i:i + segment_size]
+            if len(sub_pattern) == segment_size:
+                sub_patterns.append(sub_pattern)
+                
+        return sub_patterns
+        
+    def _generate_meta_pattern(self, child_results: List[Dict[str, Any]]) -> np.ndarray:
+        """Generate meta-pattern from child patterns"""
+        patterns = [r['pattern'] for r in child_results]
+        
+        # Resize patterns if needed
+        target_size = self.config.pattern_dim
+        resized_patterns = []
+        for pattern in patterns:
+            if len(pattern) != target_size:
+                pattern = np.interp(
+                    np.linspace(0, 1, target_size),
+                    np.linspace(0, 1, len(pattern)),
+                    pattern
+                )
+            resized_patterns.append(pattern)
+            
+        # Compute weighted average
+        weights = softmax([1.0 / (r['depth'] + 1) for r in child_results])
+        meta_pattern = np.average(resized_patterns, axis=0, weights=weights)
+        
+        return meta_pattern
+        
+    def find_similar_patterns(self, pattern: np.ndarray,
+                           depth: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Find similar patterns at specified depth"""
+        similar_patterns = []
+        
+        # Filter patterns by depth if specified
+        patterns_to_check = self.pattern_hierarchy
+        if depth is not None:
+            patterns_to_check = {
+                k: v for k, v in self.pattern_hierarchy.items()
+                if v['depth'] == depth
+            }
+            
+        # Check similarity with stored patterns
+        for pattern_id, pattern_data in patterns_to_check.items():
+            similarity = self._compute_similarity(pattern, pattern_data['pattern'])
+            
+            if similarity > 0.7:  # Similarity threshold
+                similar_patterns.append({
+                    'pattern_id': pattern_id,
+                    'similarity': similarity,
+                    'depth': pattern_data['depth'],
+                    'pattern': pattern_data['pattern']
+                })
+                
+        return similar_patterns
+        
+    def _compute_similarity(self, pattern1: np.ndarray,
+                         pattern2: np.ndarray) -> float:
+        """Compute similarity between patterns"""
+        # Resize patterns if needed
+        if pattern1.shape != pattern2.shape:
+            pattern1 = np.interp(
+                np.linspace(0, 1, self.config.pattern_dim),
+                np.linspace(0, 1, len(pattern1)),
+                pattern1
+            )
+            pattern2 = np.interp(
+                np.linspace(0, 1, self.config.pattern_dim),
+                np.linspace(0, 1, len(pattern2)),
+                pattern2
+            )
+            
+        # Compute correlation
+        return float(np.abs(np.corrcoef(pattern1, pattern2)[0,1]))
+        
+    def optimize_pattern(self, pattern: np.ndarray,
+                       target_pattern: np.ndarray) -> np.ndarray:
+        """Optimize pattern towards target"""
+        # Resize patterns if needed
+        if pattern.shape != target_pattern.shape:
+            pattern = np.interp(
+                np.linspace(0, 1, len(target_pattern)),
+                np.linspace(0, 1, len(pattern)),
+                pattern
+            )
+            
+        # Compute gradient
+        error = target_pattern - pattern
+        gradient = error * self.config.learning_rate
+        
+        # Update pattern
+        optimized_pattern = pattern + gradient
+        
+        return optimized_pattern

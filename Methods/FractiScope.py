@@ -11,6 +11,8 @@ from dataclasses import dataclass
 import logging
 from scipy import stats
 from collections import deque
+from scipy.stats import entropy
+from scipy.special import softmax
 
 logger = logging.getLogger(__name__)
 
@@ -299,3 +301,186 @@ class FractiScope:
         
         confidence = np.mean(factors)
         return float(min(confidence, self.config.confidence_threshold)) 
+
+"""
+CrossDimensionalMatcher: Implements pattern matching across different dimensions
+through fractal template adaptation and dimensional projection.
+"""
+
+@dataclass
+class CrossDimConfig:
+    """Configuration for cross-dimensional pattern matching"""
+    max_dimensions: int = 10
+    pattern_dim: int = 64
+    projection_depth: int = 3
+    similarity_threshold: float = 0.7
+    learning_rate: float = 0.01
+
+class CrossDimensionalMatcher:
+    """Matches patterns across different dimensions"""
+    
+    def __init__(self, config: CrossDimConfig):
+        self.config = config
+        self.dimension_patterns = {}
+        self.projections = {}
+        self.similarity_cache = {}
+        
+    def register_pattern(self, pattern_id: str, pattern: np.ndarray,
+                        dimension: int) -> None:
+        """Register pattern in specific dimension"""
+        if dimension > self.config.max_dimensions:
+            raise ValueError(f"Dimension {dimension} exceeds maximum")
+            
+        if dimension not in self.dimension_patterns:
+            self.dimension_patterns[dimension] = {}
+            
+        self.dimension_patterns[dimension][pattern_id] = {
+            'pattern': pattern,
+            'projections': []
+        }
+        
+    def create_projection(self, pattern_id: str, source_dim: int,
+                         target_dim: int) -> Dict[str, Any]:
+        """Create projection between dimensions"""
+        if source_dim not in self.dimension_patterns:
+            raise ValueError(f"Unknown source dimension: {source_dim}")
+            
+        if pattern_id not in self.dimension_patterns[source_dim]:
+            raise ValueError(f"Unknown pattern: {pattern_id}")
+            
+        # Create projection
+        projection_id = f"proj_{pattern_id}_{source_dim}_{target_dim}"
+        projection = {
+            'pattern_id': pattern_id,
+            'source_dim': source_dim,
+            'target_dim': target_dim,
+            'mapping': self._compute_projection_mapping(
+                self.dimension_patterns[source_dim][pattern_id]['pattern'],
+                source_dim,
+                target_dim
+            )
+        }
+        
+        # Store projection
+        self.projections[projection_id] = projection
+        self.dimension_patterns[source_dim][pattern_id]['projections'].append(
+            projection_id
+        )
+        
+        return projection
+        
+    def _compute_projection_mapping(self, pattern: np.ndarray,
+                                 source_dim: int,
+                                 target_dim: int) -> np.ndarray:
+        """Compute mapping between dimensions"""
+        # Resize pattern if needed
+        if pattern.shape != (self.config.pattern_dim,):
+            pattern = self._resize_pattern(pattern, self.config.pattern_dim)
+            
+        # Create projection matrix
+        if target_dim > source_dim:
+            # Project to higher dimension
+            mapping = np.zeros((self.config.pattern_dim, target_dim))
+            for i in range(source_dim):
+                mapping[:, i] = pattern
+            # Add fractal noise for higher dimensions
+            for i in range(source_dim, target_dim):
+                mapping[:, i] = self._generate_fractal_noise(
+                    self.config.pattern_dim
+                )
+        else:
+            # Project to lower dimension
+            mapping = np.zeros((self.config.pattern_dim, target_dim))
+            for i in range(target_dim):
+                mapping[:, i] = pattern[:target_dim]
+                
+        return mapping
+        
+    def _resize_pattern(self, pattern: np.ndarray,
+                       target_size: int) -> np.ndarray:
+        """Resize pattern to target size"""
+        return np.interp(
+            np.linspace(0, 1, target_size),
+            np.linspace(0, 1, len(pattern)),
+            pattern
+        )
+        
+    def _generate_fractal_noise(self, size: int) -> np.ndarray:
+        """Generate fractal noise pattern"""
+        noise = np.random.randn(size)
+        # Apply fractal scaling
+        frequencies = np.fft.fftfreq(size)
+        spectrum = np.fft.fft(noise)
+        spectrum *= np.abs(frequencies) ** (-1.0)  # Pink noise spectrum
+        noise = np.real(np.fft.ifft(spectrum))
+        return noise / np.max(np.abs(noise))
+        
+    def find_similar_patterns(self, pattern: np.ndarray,
+                           source_dim: int,
+                           target_dim: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Find similar patterns across dimensions"""
+        similar_patterns = []
+        
+        # Check patterns in source dimension
+        if source_dim in self.dimension_patterns:
+            for pattern_id, pattern_data in self.dimension_patterns[source_dim].items():
+                similarity = self._compute_similarity(
+                    pattern, pattern_data['pattern']
+                )
+                
+                if similarity > self.config.similarity_threshold:
+                    similar_patterns.append({
+                        'pattern_id': pattern_id,
+                        'dimension': source_dim,
+                        'similarity': similarity,
+                        'pattern': pattern_data['pattern']
+                    })
+                    
+        # Check patterns in target dimension if specified
+        if target_dim is not None and target_dim in self.dimension_patterns:
+            # Project pattern to target dimension
+            projected_pattern = self.project_pattern(
+                pattern, source_dim, target_dim
+            )
+            
+            for pattern_id, pattern_data in self.dimension_patterns[target_dim].items():
+                similarity = self._compute_similarity(
+                    projected_pattern, pattern_data['pattern']
+                )
+                
+                if similarity > self.config.similarity_threshold:
+                    similar_patterns.append({
+                        'pattern_id': pattern_id,
+                        'dimension': target_dim,
+                        'similarity': similarity,
+                        'pattern': pattern_data['pattern']
+                    })
+                    
+        return similar_patterns
+        
+    def _compute_similarity(self, pattern1: np.ndarray,
+                         pattern2: np.ndarray) -> float:
+        """Compute similarity between patterns"""
+        # Resize patterns if needed
+        if pattern1.shape != pattern2.shape:
+            pattern1 = self._resize_pattern(pattern1, self.config.pattern_dim)
+            pattern2 = self._resize_pattern(pattern2, self.config.pattern_dim)
+            
+        # Compute correlation
+        return float(np.abs(np.corrcoef(pattern1, pattern2)[0,1]))
+        
+    def project_pattern(self, pattern: np.ndarray,
+                      source_dim: int,
+                      target_dim: int) -> np.ndarray:
+        """Project pattern to target dimension"""
+        # Create or get projection mapping
+        projection_id = f"proj_temp_{source_dim}_{target_dim}"
+        if projection_id not in self.projections:
+            mapping = self._compute_projection_mapping(
+                pattern, source_dim, target_dim
+            )
+        else:
+            mapping = self.projections[projection_id]['mapping']
+            
+        # Apply projection
+        return np.dot(pattern, mapping) 
