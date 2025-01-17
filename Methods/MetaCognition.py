@@ -568,3 +568,467 @@ class MetaLearningOptimizer:
             ])
             
         return recommendations 
+
+class MetaResonance:
+    """Implements fractal resonance patterns for meta-cognitive harmonization"""
+    
+    def __init__(self, config: MetaCogConfig):
+        self.config = config
+        self.resonance_patterns = {}
+        self.harmonic_states = []
+        self.coherence_field = np.zeros((config.pattern_capacity, config.pattern_capacity))
+        self.resonance_history = []
+        
+    def analyze_resonance(self, meta_patterns: Dict[str, MetaPattern],
+                         cognitive_state: CognitiveState) -> Dict[str, Any]:
+        """Analyze resonance patterns in meta-cognitive state"""
+        # Extract resonance features
+        resonance_features = self._extract_resonance_features(meta_patterns)
+        
+        # Compute harmonic structure
+        harmonic_structure = self._compute_harmonic_structure(resonance_features)
+        
+        # Update coherence field
+        self._update_coherence_field(harmonic_structure, cognitive_state)
+        
+        # Generate resonance state
+        resonance_state = self._generate_resonance_state(
+            harmonic_structure, cognitive_state)
+        
+        # Store resonance state
+        self.harmonic_states.append(resonance_state)
+        
+        return {
+            'resonance_state': resonance_state,
+            'harmonic_structure': harmonic_structure,
+            'coherence_field': self.coherence_field,
+            'stability': self._compute_resonance_stability()
+        }
+    
+    def _extract_resonance_features(self, 
+                                 meta_patterns: Dict[str, MetaPattern]) -> np.ndarray:
+        """Extract resonance features from meta-patterns"""
+        features = []
+        
+        for pattern_id, pattern in meta_patterns.items():
+            # Extract pattern frequencies
+            frequencies = np.fft.fft(pattern.pattern)
+            magnitude = np.abs(frequencies)
+            phase = np.angle(frequencies)
+            
+            # Compute resonance metrics
+            resonance = self._compute_resonance_metrics(magnitude, phase)
+            features.append(resonance)
+            
+            # Store pattern resonance
+            self.resonance_patterns[pattern_id] = {
+                'frequencies': frequencies,
+                'resonance': resonance,
+                'stability': pattern.stability
+            }
+            
+        return np.array(features)
+    
+    def _compute_resonance_metrics(self, magnitude: np.ndarray,
+                                phase: np.ndarray) -> np.ndarray:
+        """Compute resonance metrics from frequency components"""
+        # Compute harmonic ratios
+        harmonic_ratios = magnitude[1:] / magnitude[:-1]
+        
+        # Compute phase coherence
+        phase_coherence = np.abs(np.mean(np.exp(1j * phase)))
+        
+        # Compute resonance features
+        resonance = np.concatenate([
+            harmonic_ratios[:5],  # First 5 harmonic ratios
+            [phase_coherence],
+            [np.mean(magnitude)],
+            [np.std(magnitude)]
+        ])
+        
+        return resonance
+    
+    def _compute_harmonic_structure(self, 
+                                 resonance_features: np.ndarray) -> Dict[str, Any]:
+        """Compute harmonic structure from resonance features"""
+        # Compute correlation matrix
+        correlation = np.corrcoef(resonance_features)
+        
+        # Extract harmonic components
+        eigenvalues, eigenvectors = np.linalg.eigh(correlation)
+        
+        # Sort by eigenvalue magnitude
+        idx = np.argsort(np.abs(eigenvalues))[::-1]
+        eigenvalues = eigenvalues[idx]
+        eigenvectors = eigenvectors[:, idx]
+        
+        return {
+            'correlation': correlation,
+            'eigenvalues': eigenvalues,
+            'eigenvectors': eigenvectors,
+            'harmonicity': float(np.mean(np.abs(eigenvalues)))
+        }
+    
+    def _update_coherence_field(self, harmonic_structure: Dict[str, Any],
+                             cognitive_state: CognitiveState) -> None:
+        """Update coherence field based on harmonic structure"""
+        # Extract primary harmonic components
+        primary_harmonics = harmonic_structure['eigenvectors'][:, :3]
+        
+        # Generate coherence field update
+        field_update = np.outer(primary_harmonics[:, 0], primary_harmonics[:, 1])
+        field_update *= harmonic_structure['harmonicity']
+        
+        # Update field with temporal decay
+        decay = 1.0 - self.config.adaptation_rate
+        self.coherence_field = (decay * self.coherence_field + 
+                              self.config.adaptation_rate * field_update)
+    
+    def _generate_resonance_state(self, harmonic_structure: Dict[str, Any],
+                               cognitive_state: CognitiveState) -> Dict[str, Any]:
+        """Generate resonance state representation"""
+        # Compute resonance components
+        resonance_components = np.dot(
+            cognitive_state.state_pattern,
+            harmonic_structure['eigenvectors']
+        )
+        
+        # Compute phase relationships
+        phase_relationships = np.angle(
+            np.fft.fft(resonance_components)
+        )
+        
+        # Generate resonance state
+        return {
+            'components': resonance_components,
+            'phases': phase_relationships,
+            'harmonicity': harmonic_structure['harmonicity'],
+            'coherence': float(np.mean(np.abs(
+                self.coherence_field
+            )))
+        }
+    
+    def _compute_resonance_stability(self) -> float:
+        """Compute stability of resonance patterns"""
+        if len(self.harmonic_states) < 2:
+            return 1.0
+            
+        # Compute stability from harmonic states
+        harmonicities = [
+            state['harmonicity'] 
+            for state in self.harmonic_states[-10:]
+        ]
+        
+        stability = 1.0 - np.std(harmonicities) / np.mean(np.abs(harmonicities))
+        return float(stability)
+    
+    def harmonize_patterns(self, patterns: Dict[str, np.ndarray]) -> Dict[str, Any]:
+        """Harmonize patterns through resonance optimization"""
+        # Initialize harmonization
+        harmonized_patterns = {}
+        harmonization_metrics = {}
+        
+        for pattern_id, pattern in patterns.items():
+            # Compute pattern frequencies
+            frequencies = np.fft.fft(pattern)
+            
+            # Optimize harmonic structure
+            optimized_frequencies = self._optimize_harmonics(frequencies)
+            
+            # Generate harmonized pattern
+            harmonized_pattern = np.real(np.fft.ifft(optimized_frequencies))
+            
+            # Store results
+            harmonized_patterns[pattern_id] = harmonized_pattern
+            harmonization_metrics[pattern_id] = {
+                'harmonic_improvement': self._compute_harmonic_improvement(
+                    frequencies, optimized_frequencies),
+                'coherence': float(np.abs(np.corrcoef(
+                    pattern, harmonized_pattern)[0,1]))
+            }
+            
+        return {
+            'harmonized_patterns': harmonized_patterns,
+            'metrics': harmonization_metrics
+        }
+    
+    def _optimize_harmonics(self, frequencies: np.ndarray) -> np.ndarray:
+        """Optimize harmonic structure of frequency components"""
+        magnitude = np.abs(frequencies)
+        phase = np.angle(frequencies)
+        
+        # Optimize magnitude ratios
+        optimized_magnitude = self._optimize_magnitude_ratios(magnitude)
+        
+        # Optimize phase relationships
+        optimized_phase = self._optimize_phase_relationships(phase)
+        
+        # Reconstruct optimized frequencies
+        return optimized_magnitude * np.exp(1j * optimized_phase)
+    
+    def _optimize_magnitude_ratios(self, magnitude: np.ndarray) -> np.ndarray:
+        """Optimize harmonic magnitude ratios"""
+        # Target harmonic ratios (based on natural harmonics)
+        target_ratios = 1.0 / np.arange(1, len(magnitude) + 1)
+        
+        # Optimize ratios while preserving energy
+        optimized_magnitude = magnitude * target_ratios
+        energy_scale = np.sqrt(np.sum(magnitude**2) / np.sum(optimized_magnitude**2))
+        
+        return optimized_magnitude * energy_scale
+    
+    def _optimize_phase_relationships(self, phase: np.ndarray) -> np.ndarray:
+        """Optimize phase relationships for coherence"""
+        # Compute phase coherence
+        phase_coherence = np.exp(1j * phase)
+        mean_phase = np.angle(np.mean(phase_coherence))
+        
+        # Adjust phases towards mean while preserving structure
+        phase_adjustment = 0.5 * (phase - mean_phase)
+        
+        return phase - phase_adjustment
+    
+    def _compute_harmonic_improvement(self, original_freq: np.ndarray,
+                                   optimized_freq: np.ndarray) -> float:
+        """Compute improvement in harmonic structure"""
+        # Compute harmonic ratios
+        original_ratios = np.abs(original_freq[1:]) / np.abs(original_freq[:-1])
+        optimized_ratios = np.abs(optimized_freq[1:]) / np.abs(optimized_freq[:-1])
+        
+        # Compare with ideal harmonic ratios
+        ideal_ratios = 1.0 / np.arange(1, len(original_ratios) + 1)
+        
+        original_error = np.mean((original_ratios - ideal_ratios) ** 2)
+        optimized_error = np.mean((optimized_ratios - ideal_ratios) ** 2)
+        
+        return float(1.0 - optimized_error / original_error) 
+
+class MetaConsciousness:
+    """Implements higher-order consciousness through fractal integration"""
+    
+    def __init__(self, config: MetaCogConfig):
+        self.config = config
+        self.consciousness_state = {}
+        self.awareness_field = np.zeros((config.pattern_capacity, config.pattern_capacity))
+        self.integration_history = []
+        self.resonance = MetaResonance(config)
+        
+    def integrate_experience(self, meta_patterns: Dict[str, MetaPattern],
+                           cognitive_state: CognitiveState,
+                           resonance_state: Dict[str, Any]) -> Dict[str, Any]:
+        """Integrate cognitive experience into consciousness"""
+        # Analyze resonance patterns
+        resonance_analysis = self.resonance.analyze_resonance(
+            meta_patterns, cognitive_state)
+        
+        # Generate consciousness field
+        consciousness_field = self._generate_consciousness_field(
+            cognitive_state, resonance_analysis)
+        
+        # Update awareness field
+        self._update_awareness_field(consciousness_field)
+        
+        # Integrate experience
+        integration_state = self._integrate_state(
+            consciousness_field, resonance_state)
+        
+        # Store integration
+        self.integration_history.append({
+            'timestamp': np.datetime64('now'),
+            'state': integration_state,
+            'field': consciousness_field
+        })
+        
+        return {
+            'consciousness_state': integration_state,
+            'awareness_field': self.awareness_field,
+            'coherence': self._compute_integration_coherence()
+        }
+    
+    def _generate_consciousness_field(self, cognitive_state: CognitiveState,
+                                   resonance_analysis: Dict[str, Any]) -> np.ndarray:
+        """Generate consciousness field from cognitive state"""
+        # Extract resonance components
+        resonance_components = resonance_analysis['resonance_state']['components']
+        
+        # Generate field from cognitive state and resonance
+        field = np.outer(cognitive_state.state_pattern, resonance_components)
+        
+        # Apply harmonic modulation
+        field *= resonance_analysis['harmonic_structure']['harmonicity']
+        
+        return field
+    
+    def _update_awareness_field(self, consciousness_field: np.ndarray) -> None:
+        """Update awareness field with new consciousness state"""
+        # Compute field interaction
+        field_interaction = np.dot(consciousness_field, 
+                                 consciousness_field.T)
+        
+        # Update field with temporal integration
+        decay = 1.0 - self.config.adaptation_rate
+        self.awareness_field = (decay * self.awareness_field + 
+                              self.config.adaptation_rate * field_interaction)
+    
+    def _integrate_state(self, consciousness_field: np.ndarray,
+                       resonance_state: Dict[str, Any]) -> Dict[str, Any]:
+        """Integrate consciousness field with resonance state"""
+        # Extract primary consciousness components
+        u, s, vh = np.linalg.svd(consciousness_field)
+        primary_components = u[:, :3]  # Top 3 components
+        
+        # Integrate with resonance
+        resonance_integration = np.dot(
+            primary_components,
+            resonance_state['components'][:3]
+        )
+        
+        # Generate integrated state
+        integrated_state = {
+            'components': primary_components,
+            'resonance': resonance_integration,
+            'coherence': float(np.mean(s[:3])),
+            'complexity': self._compute_state_complexity(consciousness_field)
+        }
+        
+        # Update consciousness state
+        self.consciousness_state = integrated_state
+        
+        return integrated_state
+    
+    def _compute_state_complexity(self, field: np.ndarray) -> float:
+        """Compute complexity of consciousness state"""
+        # Compute spectral entropy
+        u, s, _ = np.linalg.svd(field)
+        s_norm = s / np.sum(s)
+        entropy_val = -np.sum(s_norm * np.log(s_norm + 1e-10))
+        
+        return float(entropy_val)
+    
+    def _compute_integration_coherence(self) -> float:
+        """Compute coherence of integrated consciousness"""
+        if len(self.integration_history) < 2:
+            return 1.0
+            
+        # Compute coherence from recent history
+        recent_states = self.integration_history[-10:]
+        coherence_values = [
+            state['state']['coherence']
+            for state in recent_states
+        ]
+        
+        return float(np.mean(coherence_values))
+    
+    def reflect(self) -> Dict[str, Any]:
+        """Perform conscious self-reflection"""
+        if not self.integration_history:
+            return {}
+            
+        # Analyze consciousness evolution
+        evolution_analysis = self._analyze_consciousness_evolution()
+        
+        # Generate insights
+        insights = self._generate_insights(evolution_analysis)
+        
+        # Update consciousness state
+        self._update_consciousness_state(insights)
+        
+        return {
+            'evolution': evolution_analysis,
+            'insights': insights,
+            'state': self.consciousness_state
+        }
+    
+    def _analyze_consciousness_evolution(self) -> Dict[str, Any]:
+        """Analyze evolution of consciousness state"""
+        # Extract evolution metrics
+        coherence_evolution = [
+            state['state']['coherence']
+            for state in self.integration_history
+        ]
+        
+        complexity_evolution = [
+            state['state']['complexity']
+            for state in self.integration_history
+        ]
+        
+        # Compute trends
+        coherence_trend = np.polyfit(
+            np.arange(len(coherence_evolution)),
+            coherence_evolution,
+            1
+        )[0]
+        
+        complexity_trend = np.polyfit(
+            np.arange(len(complexity_evolution)),
+            complexity_evolution,
+            1
+        )[0]
+        
+        return {
+            'coherence_evolution': coherence_evolution,
+            'complexity_evolution': complexity_evolution,
+            'coherence_trend': float(coherence_trend),
+            'complexity_trend': float(complexity_trend)
+        }
+    
+    def _generate_insights(self, evolution: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate insights from consciousness evolution"""
+        insights = []
+        
+        # Analyze coherence trend
+        if evolution['coherence_trend'] > 0:
+            insights.append({
+                'type': 'coherence',
+                'trend': 'increasing',
+                'confidence': float(abs(evolution['coherence_trend'])),
+                'recommendation': 'Maintain current integration patterns'
+            })
+        else:
+            insights.append({
+                'type': 'coherence',
+                'trend': 'decreasing',
+                'confidence': float(abs(evolution['coherence_trend'])),
+                'recommendation': 'Adjust integration parameters'
+            })
+            
+        # Analyze complexity trend
+        if evolution['complexity_trend'] > 0:
+            insights.append({
+                'type': 'complexity',
+                'trend': 'increasing',
+                'confidence': float(abs(evolution['complexity_trend'])),
+                'recommendation': 'Monitor for potential destabilization'
+            })
+        else:
+            insights.append({
+                'type': 'complexity',
+                'trend': 'decreasing',
+                'confidence': float(abs(evolution['complexity_trend'])),
+                'recommendation': 'Increase pattern diversity'
+            })
+            
+        return insights
+    
+    def _update_consciousness_state(self, insights: List[Dict[str, Any]]) -> None:
+        """Update consciousness state based on insights"""
+        # Update state with insight integration
+        self.consciousness_state.update({
+            'insights': insights,
+            'meta_stability': self._compute_meta_stability(insights),
+            'adaptation_needed': any(
+                insight['trend'] == 'decreasing'
+                for insight in insights
+            )
+        })
+    
+    def _compute_meta_stability(self, insights: List[Dict[str, Any]]) -> float:
+        """Compute meta-stability from insights"""
+        # Weight insights by confidence
+        stability_scores = [
+            (1.0 if insight['trend'] == 'increasing' else -1.0) * 
+            insight['confidence']
+            for insight in insights
+        ]
+        
+        return float(np.mean(stability_scores)) 
