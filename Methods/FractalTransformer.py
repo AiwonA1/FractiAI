@@ -1,194 +1,259 @@
 """
 FractalTransformer.py
 
-Implements advanced fractal-based transformer architecture for pattern processing
-and transformation across multiple scales and dimensions.
+Implements advanced fractal-based transformer architecture for pattern recognition,
+transformation and resonance across multiple scales and domains.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple, Any
+import numpy as np
+from scipy.stats import entropy
+import networkx as nx
 
-@dataclass
+@dataclass 
 class FractalTransformerConfig:
     """Configuration for fractal transformer"""
-    d_model: int = 512
-    nhead: int = 8
+    hidden_dim: int = 256
     num_layers: int = 6
-    dim_feedforward: int = 2048
+    num_heads: int = 8
+    ff_dim: int = 1024
     dropout: float = 0.1
-    activation: str = "relu"
-    layer_norm_eps: float = 1e-5
-    batch_first: bool = True
-    norm_first: bool = False
-    fractal_depth: int = 3
-    scale_factor: float = 2.0
-
+    max_seq_length: int = 1024
+    pattern_dim: int = 64
+    num_scales: int = 4
+    resonance_factor: float = 0.1
+    coherence_threshold: float = 0.7
+    adaptation_rate: float = 0.01
+    
 class FractalAttention(nn.Module):
     """Multi-scale fractal attention mechanism"""
     
     def __init__(self, config: FractalTransformerConfig):
         super().__init__()
         self.config = config
-        self.scales = nn.ModuleList([
-            nn.MultiheadAttention(
-                config.d_model,
-                config.nhead,
-                dropout=config.dropout,
-                batch_first=config.batch_first
-            )
-            for _ in range(config.fractal_depth)
+        
+        # Multi-scale projections
+        self.scale_projections = nn.ModuleList([
+            nn.Linear(config.hidden_dim, config.hidden_dim)
+            for _ in range(config.num_scales)
         ])
-        self.scale_weights = nn.Parameter(torch.ones(config.fractal_depth))
         
-    def forward(self, x: torch.Tensor,
-               mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """Forward pass with multi-scale attention"""
-        # Normalize scale weights
-        scale_weights = F.softmax(self.scale_weights, dim=0)
+        # Fractal attention heads
+        self.q_proj = nn.Linear(config.hidden_dim, config.hidden_dim)
+        self.k_proj = nn.Linear(config.hidden_dim, config.hidden_dim)
+        self.v_proj = nn.Linear(config.hidden_dim, config.hidden_dim)
+        self.o_proj = nn.Linear(config.hidden_dim, config.hidden_dim)
         
-        # Process each scale
-        outputs = []
-        current_x = x
-        for i, attention in enumerate(self.scales):
-            # Apply attention at current scale
-            scale_out, _ = attention(current_x, current_x, current_x, 
-                                   attn_mask=mask)
-            outputs.append(scale_out * scale_weights[i])
+        self.dropout = nn.Dropout(config.dropout)
+        
+    def forward(self, x: torch.Tensor, 
+                mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+        """Forward pass with fractal attention"""
+        B, L, D = x.shape
+        H = self.config.num_heads
+        
+        # Generate queries, keys, values
+        q = self.q_proj(x).view(B, L, H, -1)
+        k = self.k_proj(x).view(B, L, H, -1)
+        v = self.v_proj(x).view(B, L, H, -1)
+        
+        # Multi-scale processing
+        scale_outputs = []
+        for scale_proj in self.scale_projections:
+            # Project to scale space
+            scale_q = scale_proj(q.view(B, L, -1)).view(B, L, H, -1)
+            scale_k = scale_proj(k.view(B, L, -1)).view(B, L, H, -1)
+            scale_v = scale_proj(v.view(B, L, -1)).view(B, L, H, -1)
             
-            # Downsample for next scale
-            if i < len(self.scales) - 1:
-                current_x = F.avg_pool1d(
-                    current_x.transpose(1, 2),
-                    kernel_size=2,
-                    stride=2
-                ).transpose(1, 2)
+            # Compute attention scores
+            scores = torch.matmul(scale_q, scale_k.transpose(-2, -1)) / np.sqrt(D // H)
+            
+            if mask is not None:
+                scores = scores.masked_fill(mask == 0, -1e9)
                 
-        # Combine scales
-        return sum(outputs)
+            # Apply attention
+            attn = F.softmax(scores, dim=-1)
+            attn = self.dropout(attn)
+            
+            # Get scale output
+            scale_out = torch.matmul(attn, scale_v)
+            scale_outputs.append(scale_out)
+            
+        # Combine scales with learned weights
+        scale_weights = F.softmax(torch.randn(len(scale_outputs)), dim=0)
+        combined = sum(w * o for w, o in zip(scale_weights, scale_outputs))
+        
+        # Project to output space
+        output = self.o_proj(combined.view(B, L, -1))
+        
+        return output
 
-class FractalTransformerLayer(nn.Module):
-    """Transformer layer with fractal attention"""
+class FractalPatternLayer(nn.Module):
+    """Pattern recognition and transformation layer"""
     
     def __init__(self, config: FractalTransformerConfig):
         super().__init__()
         self.config = config
         
-        # Fractal attention
-        self.fractal_attention = FractalAttention(config)
+        # Pattern detection
+        self.pattern_proj = nn.Linear(config.hidden_dim, config.pattern_dim)
+        self.pattern_attn = FractalAttention(config)
         
-        # Feed forward
-        self.linear1 = nn.Linear(config.d_model, config.dim_feedforward)
+        # Pattern transformation
+        self.transform_net = nn.Sequential(
+            nn.Linear(config.pattern_dim, config.ff_dim),
+            nn.GELU(),
+            nn.Linear(config.ff_dim, config.pattern_dim)
+        )
+        
+        # Resonance components
+        self.resonance_gate = nn.Linear(config.pattern_dim * 2, 1)
+        self.adaptation_layer = nn.Linear(config.pattern_dim, config.pattern_dim)
+        
         self.dropout = nn.Dropout(config.dropout)
-        self.linear2 = nn.Linear(config.dim_feedforward, config.d_model)
-        
-        # Layer norms
-        self.norm1 = nn.LayerNorm(config.d_model, eps=config.layer_norm_eps)
-        self.norm2 = nn.LayerNorm(config.d_model, eps=config.layer_norm_eps)
-        
-        # Activation
-        self.activation = getattr(F, config.activation)
+        self.layer_norm = nn.LayerNorm(config.hidden_dim)
         
     def forward(self, x: torch.Tensor,
-               mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """Forward pass"""
-        if self.config.norm_first:
-            x = x + self._fractal_attention_block(self.norm1(x), mask)
-            x = x + self._feedforward_block(self.norm2(x))
-        else:
-            x = self.norm1(x + self._fractal_attention_block(x, mask))
-            x = self.norm2(x + self._feedforward_block(x))
-        return x
+               patterns: Optional[Dict[str, torch.Tensor]] = None) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+        """Forward pass with pattern recognition"""
+        # Project to pattern space
+        pattern_features = self.pattern_proj(x)
         
-    def _fractal_attention_block(self, x: torch.Tensor,
-                               mask: Optional[torch.Tensor]) -> torch.Tensor:
-        """Apply fractal attention"""
-        return self.fractal_attention(x, mask)
+        # Apply pattern attention
+        pattern_context = self.pattern_attn(pattern_features)
         
-    def _feedforward_block(self, x: torch.Tensor) -> torch.Tensor:
-        """Apply feed forward layer"""
-        x = self.linear1(x)
-        x = self.activation(x)
-        x = self.dropout(x)
-        x = self.linear2(x)
-        return self.dropout(x)
+        # Detect and transform patterns
+        transformed_patterns = {}
+        if patterns is not None:
+            for name, pattern in patterns.items():
+                # Pattern matching
+                similarity = F.cosine_similarity(
+                    pattern_features.unsqueeze(1),
+                    pattern.unsqueeze(0),
+                    dim=-1
+                )
+                
+                # Transform matched patterns
+                if similarity.max() > self.config.coherence_threshold:
+                    transformed = self.transform_net(pattern)
+                    
+                    # Apply resonance
+                    resonance = torch.sigmoid(
+                        self.resonance_gate(
+                            torch.cat([pattern, transformed], dim=-1)
+                        )
+                    )
+                    transformed = resonance * transformed + (1 - resonance) * pattern
+                    
+                    # Adapt pattern
+                    adaptation = torch.tanh(
+                        self.adaptation_layer(transformed)
+                    ) * self.config.adaptation_rate
+                    transformed = transformed + adaptation
+                    
+                    transformed_patterns[name] = transformed
+                    
+        # Combine with input
+        output = x + self.dropout(pattern_context)
+        output = self.layer_norm(output)
+        
+        return output, transformed_patterns
 
 class FractalTransformer(nn.Module):
-    """Main fractal transformer model"""
+    """Main fractal transformer architecture"""
     
     def __init__(self, config: FractalTransformerConfig):
         super().__init__()
         self.config = config
         
         # Input embedding
-        self.embedding = nn.Linear(config.d_model, config.d_model)
+        self.input_embed = nn.Linear(config.hidden_dim, config.hidden_dim)
         
-        # Fractal transformer layers
-        self.layers = nn.ModuleList([
-            FractalTransformerLayer(config)
+        # Fractal pattern layers
+        self.pattern_layers = nn.ModuleList([
+            FractalPatternLayer(config)
             for _ in range(config.num_layers)
         ])
         
-        # Output projection
-        self.output_projection = nn.Linear(config.d_model, config.d_model)
+        # Pattern memory
+        self.pattern_memory: Dict[str, torch.Tensor] = {}
+        self.pattern_graph = nx.Graph()
         
-        # Position encoding
-        self.pos_encoder = self._build_position_encoding()
-        
-    def _build_position_encoding(self) -> nn.Module:
-        """Build sinusoidal position encoding"""
-        pe = torch.zeros(1000, self.config.d_model)
-        position = torch.arange(0, 1000).unsqueeze(1)
-        div_term = torch.exp(
-            torch.arange(0, self.config.d_model, 2) * 
-            -(np.log(10000.0) / self.config.d_model)
-        )
-        pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
-        pe = pe.unsqueeze(0)
-        return nn.Parameter(pe, requires_grad=False)
+        self.dropout = nn.Dropout(config.dropout)
+        self.layer_norm = nn.LayerNorm(config.hidden_dim)
         
     def forward(self, x: torch.Tensor,
                mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """Forward pass"""
-        # Add position encoding
-        x = x + self.pos_encoder[:, :x.size(1)]
+        """Forward pass through fractal transformer"""
+        # Input embedding
+        x = self.input_embed(x)
+        x = self.dropout(x)
         
-        # Initial embedding
-        x = self.embedding(x)
-        
-        # Process through layers
-        for layer in self.layers:
-            x = layer(x, mask)
+        # Process through pattern layers
+        all_patterns = {}
+        for layer in self.pattern_layers:
+            x, patterns = layer(x, self.pattern_memory)
+            all_patterns.update(patterns)
             
-        # Output projection
-        x = self.output_projection(x)
+        # Update pattern memory
+        self._update_pattern_memory(all_patterns)
         
-        return x
-    
-    def encode_pattern(self, pattern: torch.Tensor) -> torch.Tensor:
-        """Encode pattern through transformer"""
-        return self.forward(pattern)
-    
-    def decode_pattern(self, encoded: torch.Tensor) -> torch.Tensor:
-        """Decode pattern from transformer encoding"""
-        # Use same forward pass but with different head
-        return self.forward(encoded)
-    
-    def transform_pattern(self, pattern: torch.Tensor,
-                        target: Optional[torch.Tensor] = None) -> torch.Tensor:
-        """Transform pattern while preserving fractal properties"""
-        # Encode pattern
-        encoded = self.encode_pattern(pattern)
+        # Final normalization
+        output = self.layer_norm(x)
         
-        if target is not None:
-            # Align with target pattern
-            target_encoded = self.encode_pattern(target)
-            encoded = encoded + (target_encoded - encoded) * 0.5
+        return output
+        
+    def _update_pattern_memory(self, new_patterns: Dict[str, torch.Tensor]) -> None:
+        """Update pattern memory and graph"""
+        # Update patterns
+        self.pattern_memory.update(new_patterns)
+        
+        # Update pattern graph
+        for name1, pattern1 in self.pattern_memory.items():
+            self.pattern_graph.add_node(name1)
+            for name2, pattern2 in self.pattern_memory.items():
+                if name1 != name2:
+                    similarity = F.cosine_similarity(
+                        pattern1.mean(0),
+                        pattern2.mean(0),
+                        dim=0
+                    )
+                    if similarity > self.config.coherence_threshold:
+                        self.pattern_graph.add_edge(
+                            name1, name2, weight=float(similarity)
+                        )
+                        
+        # Prune old patterns
+        if len(self.pattern_memory) > self.config.max_seq_length:
+            # Remove least connected patterns
+            to_remove = []
+            for node in self.pattern_graph.nodes():
+                if len(list(self.pattern_graph.neighbors(node))) == 0:
+                    to_remove.append(node)
             
-        # Decode transformed pattern
-        return self.decode_pattern(encoded) 
+            for node in to_remove:
+                self.pattern_graph.remove_node(node)
+                self.pattern_memory.pop(node)
+                
+    def get_pattern_clusters(self) -> List[List[str]]:
+        """Get clusters of related patterns"""
+        return list(nx.community.greedy_modularity_communities(self.pattern_graph))
+        
+    def get_pattern_centrality(self) -> Dict[str, float]:
+        """Get pattern importance scores"""
+        return nx.eigenvector_centrality(self.pattern_graph, weight='weight')
+        
+    def transform_pattern(self, pattern: torch.Tensor) -> torch.Tensor:
+        """Transform a single pattern"""
+        # Ensure correct shape
+        if len(pattern.shape) == 2:
+            pattern = pattern.unsqueeze(0)
+            
+        # Pass through transformer
+        transformed = self.forward(pattern)
+        
+        return transformed.squeeze(0) 

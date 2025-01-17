@@ -21,6 +21,7 @@ from Methods.MetaCognition import MetaCogConfig, CognitiveState
 from Methods.FractalTransformer import FractalTransformer, FractalTransformerConfig
 from Methods.ActiveInference import ActiveInferenceAgent, ActiveInferenceConfig
 from Methods.FreeEnergyPrinciple import FreeEnergyMinimizer, FEPConfig
+import networkx as nx
 
 logger = logging.getLogger(__name__)
 
@@ -317,6 +318,126 @@ class FederatedNode:
             'coherence': float(np.mean(np.abs(state)))
         })
 
+class QuantumPatternSynchronizer:
+    """Implements quantum-aware pattern synchronization for federated learning"""
+    
+    def __init__(self, config: FederatedConfig):
+        self.config = config
+        self.quantum_states = {}
+        self.entanglement_graph = nx.Graph()
+        self.coherence_metrics = defaultdict(list)
+        
+    def synchronize_patterns(self, 
+                           patterns: Dict[str, np.ndarray],
+                           quantum_states: Dict[str, np.ndarray]) -> Dict[str, np.ndarray]:
+        """Synchronize patterns using quantum state information"""
+        # Generate quantum superposition of patterns
+        superposition = self._create_superposition(patterns, quantum_states)
+        
+        # Apply quantum interference to enhance pattern alignment
+        aligned_patterns = self._apply_quantum_interference(superposition)
+        
+        # Update entanglement graph
+        self._update_entanglement_graph(patterns, quantum_states)
+        
+        # Measure and collapse to classical patterns
+        synchronized_patterns = self._measure_patterns(aligned_patterns)
+        
+        return synchronized_patterns
+        
+    def _create_superposition(self, 
+                            patterns: Dict[str, np.ndarray],
+                            quantum_states: Dict[str, np.ndarray]) -> np.ndarray:
+        """Create quantum superposition of patterns"""
+        # Convert patterns to quantum states
+        quantum_patterns = []
+        for node_id, pattern in patterns.items():
+            quantum_state = quantum_states.get(node_id)
+            if quantum_state is not None:
+                # Apply quantum transformation
+                amplitude = np.fft.fft(pattern)
+                phase = np.angle(quantum_state)
+                quantum_pattern = amplitude * np.exp(1j * phase)
+                quantum_patterns.append(quantum_pattern)
+                
+        # Create superposition
+        if quantum_patterns:
+            superposition = np.sum(quantum_patterns, axis=0)
+            return superposition / np.linalg.norm(superposition)
+        return np.array([])
+        
+    def _apply_quantum_interference(self, superposition: np.ndarray) -> np.ndarray:
+        """Apply quantum interference effects"""
+        if len(superposition) == 0:
+            return superposition
+            
+        # Apply phase alignment
+        phases = np.angle(superposition)
+        coherent_phases = np.unwrap(phases)
+        
+        # Apply quantum interference
+        interference = np.exp(1j * coherent_phases)
+        aligned = superposition * interference
+        
+        # Apply quantum decoherence protection
+        decoherence_mask = np.exp(-np.abs(aligned) / self.config.coherence_threshold)
+        protected = aligned * decoherence_mask
+        
+        return protected
+        
+    def _update_entanglement_graph(self,
+                                 patterns: Dict[str, np.ndarray],
+                                 quantum_states: Dict[str, np.ndarray]) -> None:
+        """Update quantum entanglement graph"""
+        # Clear old edges
+        self.entanglement_graph.clear()
+        
+        # Add nodes
+        self.entanglement_graph.add_nodes_from(patterns.keys())
+        
+        # Calculate and add entanglement edges
+        for node1, state1 in quantum_states.items():
+            for node2, state2 in quantum_states.items():
+                if node1 != node2:
+                    # Calculate quantum correlation
+                    correlation = np.abs(np.dot(state1.conj(), state2))
+                    if correlation > self.config.coherence_threshold:
+                        self.entanglement_graph.add_edge(
+                            node1, node2, weight=float(correlation))
+                        
+        # Update coherence metrics
+        for node in self.entanglement_graph.nodes():
+            neighbors = list(self.entanglement_graph.neighbors(node))
+            if neighbors:
+                coherence = np.mean([
+                    self.entanglement_graph[node][n]['weight']
+                    for n in neighbors
+                ])
+                self.coherence_metrics[node].append(coherence)
+                
+    def _measure_patterns(self, aligned_patterns: np.ndarray) -> Dict[str, np.ndarray]:
+        """Measure quantum states to obtain classical patterns"""
+        if len(aligned_patterns) == 0:
+            return {}
+            
+        # Perform measurement
+        measured = np.abs(aligned_patterns) ** 2
+        phases = np.angle(aligned_patterns)
+        
+        # Convert to classical patterns
+        classical_patterns = {}
+        for node in self.entanglement_graph.nodes():
+            # Apply phase correction
+            phase_correction = np.exp(1j * phases)
+            pattern = np.real(np.fft.ifft(measured * phase_correction))
+            classical_patterns[node] = pattern
+            
+        return classical_patterns
+        
+    def get_coherence_metrics(self) -> Dict[str, List[float]]:
+        """Get coherence metrics for all nodes"""
+        return dict(self.coherence_metrics)
+
 class FederatedInference:
     """Main federated inference system"""
     
@@ -326,6 +447,7 @@ class FederatedInference:
         self.secure_aggregation = SecureAggregation(config)
         self.quantum_state = QuantumFederatedState(config)
         self.active_inference = FederatedActiveInference(config)
+        self.quantum_sync = QuantumPatternSynchronizer(config)  # Add quantum synchronizer
         self.global_patterns = {}
         self.round_history = []
         
@@ -346,6 +468,7 @@ class FederatedInference:
         # Collect updates from nodes
         node_updates = {}
         node_actions = {}
+        quantum_states = {}
         for node_id, node in self.nodes.items():
             # Get node update
             pattern, metadata = node.prepare_update()
@@ -354,9 +477,12 @@ class FederatedInference:
                 inference_result = self.active_inference.process_node_state(
                     node_id, pattern, goal_state)
                 
+                # Get quantum state
+                quantum_states[node_id] = node.cognitive_state.get_quantum_state()
+                
                 # Add security measures
                 noised_pattern = self.secure_aggregation.add_noise_mask(
-                    pattern + inference_result['action'],  # Add selected action
+                    pattern + inference_result['action'],
                     node_id, len(self.round_history))
                 encrypted_pattern = self.secure_aggregation.encrypt_pattern(
                     noised_pattern, node_id)
@@ -367,12 +493,30 @@ class FederatedInference:
                 }
                 node_actions[node_id] = inference_result
                 
-        # Aggregate updates
-        aggregated_pattern = self._aggregate_updates(node_updates)
-        
-        # Synchronize active inference policies
-        self.active_inference.synchronize_policies()
-        
+        # Decrypt patterns
+        decrypted_patterns = {}
+        for node_id, update in node_updates.items():
+            decrypted = self.secure_aggregation.decrypt_pattern(
+                update['pattern'], node_id)
+            decrypted_patterns[node_id] = decrypted
+            
+        # Apply quantum synchronization
+        synchronized_patterns = self.quantum_sync.synchronize_patterns(
+            decrypted_patterns, quantum_states)
+            
+        # Aggregate synchronized patterns
+        if synchronized_patterns:
+            weights = [
+                update['metadata']['num_patterns'] 
+                for update in node_updates.values()
+            ]
+            weights = np.array(weights) / np.sum(weights)
+            aggregated_pattern = np.average(
+                list(synchronized_patterns.values()),
+                axis=0, weights=weights)
+        else:
+            aggregated_pattern = np.array([])
+            
         # Update quantum states
         self._update_quantum_states()
         
@@ -382,7 +526,8 @@ class FederatedInference:
             'num_updates': len(node_updates),
             'aggregated_pattern': aggregated_pattern,
             'quantum_coherence': self.quantum_state.synchronize_states(),
-            'node_actions': node_actions
+            'node_actions': node_actions,
+            'synchronization_metrics': self.quantum_sync.get_coherence_metrics()
         }
         self.round_history.append(round_results)
         
