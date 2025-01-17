@@ -1,171 +1,301 @@
 """
-rate_limiter.py
+Rate limiting module for FractiAI API
 
-Rate limiting system for FractiAI API to control request rates and ensure fair usage.
+Implements sophisticated rate limiting with token bucket algorithm,
+adaptive limits, and distributed rate limiting capabilities.
 """
 
-from fastapi import HTTPException, Request
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Any
+import asyncio
 import time
 import logging
 from dataclasses import dataclass
-from collections import defaultdict
-import asyncio
+from enum import Enum
+import redis.asyncio as redis
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
+class LimitType(str, Enum):
+    """Types of rate limits"""
+    REQUESTS = "requests"
+    BANDWIDTH = "bandwidth"
+    COMPUTE = "compute"
+    CONCURRENT = "concurrent"
+
 @dataclass
-class RateLimitConfig:
-    """Configuration for rate limiting"""
-    requests_per_minute: int = 60
-    burst_size: int = 10
-    cleanup_interval: int = 300  # 5 minutes
-    penalty_duration: int = 3600  # 1 hour
+class RateLimit:
+    """Rate limit configuration"""
+    limit: float
+    window: float
+    cost: float = 1.0
+    burst_size: Optional[float] = None
+    
+    def __post_init__(self):
+        """Set default burst size if not provided"""
+        if self.burst_size is None:
+            self.burst_size = self.limit
 
 class TokenBucket:
-    """Token bucket rate limiter implementation"""
+    """Token bucket for rate limiting"""
     
-    def __init__(self, rate: float, capacity: int):
-        self.rate = rate  # tokens per second
-        self.capacity = capacity
-        self.tokens = capacity
+    def __init__(
+        self,
+        rate_limit: RateLimit,
+        initial_tokens: Optional[float] = None
+    ):
+        self.rate = rate_limit.limit / rate_limit.window
+        self.capacity = rate_limit.burst_size
+        self.tokens = initial_tokens if initial_tokens is not None else self.capacity
         self.last_update = time.time()
         
-    def consume(self, tokens: int = 1) -> bool:
-        """Try to consume tokens from bucket"""
+    def update(self) -> None:
+        """Update token count based on elapsed time"""
         now = time.time()
-        
-        # Add new tokens based on time passed
-        time_passed = now - self.last_update
+        elapsed = now - self.last_update
         self.tokens = min(
             self.capacity,
-            self.tokens + time_passed * self.rate
+            self.tokens + elapsed * self.rate
         )
         self.last_update = now
         
-        # Try to consume tokens
+    def consume(self, tokens: float = 1.0) -> bool:
+        """Attempt to consume tokens"""
+        self.update()
         if self.tokens >= tokens:
             self.tokens -= tokens
             return True
         return False
 
 class RateLimiter:
-    """Rate limiting system with penalties and quotas"""
+    """Rate limiter with distributed capabilities"""
     
-    def __init__(self, config: RateLimitConfig):
-        self.config = config
-        self.limiters: Dict[str, TokenBucket] = {}
-        self.penalties: Dict[str, float] = {}
-        self.usage_stats: Dict[str, Dict] = defaultdict(lambda: {
-            'total_requests': 0,
-            'blocked_requests': 0,
-            'last_request': 0.0
-        })
-        
-        # Start cleanup task
-        asyncio.create_task(self._cleanup_loop())
-        
-    async def check_rate_limit(self, request: Request) -> bool:
-        """Check if request should be rate limited"""
-        client_id = self._get_client_id(request)
-        
-        # Check for penalties
-        if self._is_penalized(client_id):
-            self.usage_stats[client_id]['blocked_requests'] += 1
-            raise HTTPException(
-                status_code=429,
-                detail="Rate limit exceeded. Penalty in effect."
+    def __init__(
+        self,
+        redis_url: Optional[str] = None,
+        default_window: float = 60.0,
+        default_limit: float = 100.0
+    ):
+        self._redis = redis.from_url(redis_url) if redis_url else None
+        self._local_buckets: Dict[str, Dict[LimitType, TokenBucket]] = {}
+        self._default_limits = {
+            LimitType.REQUESTS: RateLimit(
+                limit=default_limit,
+                window=default_window
+            ),
+            LimitType.BANDWIDTH: RateLimit(
+                limit=1024 * 1024,  # 1MB/s
+                window=1.0
+            ),
+            LimitType.COMPUTE: RateLimit(
+                limit=1000,  # Compute units
+                window=60.0
+            ),
+            LimitType.CONCURRENT: RateLimit(
+                limit=10,
+                window=1.0
             )
-            
-        # Get or create limiter
-        limiter = self._get_limiter(client_id)
-        
-        # Try to consume token
-        if not limiter.consume():
-            self._apply_penalty(client_id)
-            self.usage_stats[client_id]['blocked_requests'] += 1
-            raise HTTPException(
-                status_code=429,
-                detail="Rate limit exceeded"
-            )
-            
-        # Update stats
-        self.usage_stats[client_id]['total_requests'] += 1
-        self.usage_stats[client_id]['last_request'] = time.time()
-        
-        return True
-        
-    def _get_client_id(self, request: Request) -> str:
-        """Get client identifier from request"""
-        # Try to get API key first
-        api_key = request.headers.get('X-API-Key')
-        if api_key:
-            return f"api_{api_key}"
-            
-        # Fall back to IP address
-        forwarded = request.headers.get('X-Forwarded-For')
-        if forwarded:
-            return f"ip_{forwarded.split(',')[0]}"
-        return f"ip_{request.client.host}"
-        
-    def _get_limiter(self, client_id: str) -> TokenBucket:
-        """Get or create token bucket for client"""
-        if client_id not in self.limiters:
-            self.limiters[client_id] = TokenBucket(
-                self.config.requests_per_minute / 60.0,
-                self.config.burst_size
-            )
-        return self.limiters[client_id]
-        
-    def _is_penalized(self, client_id: str) -> bool:
-        """Check if client is currently penalized"""
-        if client_id in self.penalties:
-            if time.time() < self.penalties[client_id]:
-                return True
-            del self.penalties[client_id]
-        return False
-        
-    def _apply_penalty(self, client_id: str) -> None:
-        """Apply rate limit penalty to client"""
-        self.penalties[client_id] = time.time() + self.config.penalty_duration
-        logger.warning(f"Applied rate limit penalty to {client_id}")
-        
-    async def _cleanup_loop(self) -> None:
-        """Periodically clean up old entries"""
-        while True:
-            await asyncio.sleep(self.config.cleanup_interval)
-            self._cleanup()
-            
-    def _cleanup(self) -> None:
-        """Clean up old entries"""
-        now = time.time()
-        
-        # Clean up penalties
-        expired_penalties = [
-            client_id for client_id, expire_time in self.penalties.items()
-            if now >= expire_time
-        ]
-        for client_id in expired_penalties:
-            del self.penalties[client_id]
-            
-        # Clean up inactive limiters
-        inactive_threshold = now - self.config.cleanup_interval
-        inactive_limiters = [
-            client_id for client_id in self.limiters
-            if self.usage_stats[client_id]['last_request'] < inactive_threshold
-        ]
-        for client_id in inactive_limiters:
-            del self.limiters[client_id]
-            del self.usage_stats[client_id]
-            
-    def get_usage_stats(self, client_id: Optional[str] = None) -> Dict:
-        """Get usage statistics"""
-        if client_id:
-            return self.usage_stats[client_id]
-        return {
-            client_id: stats.copy()
-            for client_id, stats in self.usage_stats.items()
         }
+        
+    async def check_limit(
+        self,
+        key: str,
+        limit_type: LimitType = LimitType.REQUESTS,
+        cost: float = 1.0
+    ) -> bool:
+        """Check if operation is within rate limit"""
+        if self._redis:
+            return await self._check_distributed_limit(key, limit_type, cost)
+        return self._check_local_limit(key, limit_type, cost)
+        
+    def _check_local_limit(
+        self,
+        key: str,
+        limit_type: LimitType,
+        cost: float
+    ) -> bool:
+        """Check local rate limit"""
+        # Initialize buckets for key if not exists
+        if key not in self._local_buckets:
+            self._local_buckets[key] = {}
+            
+        # Initialize bucket for limit type if not exists
+        if limit_type not in self._local_buckets[key]:
+            self._local_buckets[key][limit_type] = TokenBucket(
+                self._default_limits[limit_type]
+            )
+            
+        # Check limit
+        return self._local_buckets[key][limit_type].consume(cost)
+        
+    async def _check_distributed_limit(
+        self,
+        key: str,
+        limit_type: LimitType,
+        cost: float
+    ) -> bool:
+        """Check distributed rate limit using Redis"""
+        try:
+            redis_key = f"ratelimit:{key}:{limit_type.value}"
+            window = self._default_limits[limit_type].window
+            limit = self._default_limits[limit_type].limit
+            
+            # Get current window and count
+            now = time.time()
+            current_window = int(now / window)
+            
+            # Update window and count atomically
+            async with self._redis.pipeline() as pipe:
+                # Watch the key for changes
+                await pipe.watch(redis_key)
+                
+                # Get current data
+                data = await pipe.hgetall(redis_key)
+                stored_window = int(data.get(b'window', 0))
+                count = float(data.get(b'count', 0))
+                
+                # Reset if in new window
+                if current_window > stored_window:
+                    count = 0
+                    stored_window = current_window
+                    
+                # Check if would exceed limit
+                if count + cost > limit:
+                    return False
+                    
+                # Update values
+                pipe.multi()
+                pipe.hset(
+                    redis_key,
+                    mapping={
+                        'window': stored_window,
+                        'count': count + cost
+                    }
+                )
+                pipe.expire(redis_key, int(window * 2))
+                
+                # Execute transaction
+                await pipe.execute()
+                return True
+                
+        except redis.WatchError:
+            # Key modified, retry
+            return await self._check_distributed_limit(key, limit_type, cost)
+        except Exception as e:
+            logger.error(f"Redis error: {str(e)}")
+            # Fallback to local limit
+            return self._check_local_limit(key, limit_type, cost)
+            
+    def set_limit(
+        self,
+        key: str,
+        limit_type: LimitType,
+        rate_limit: RateLimit
+    ) -> None:
+        """Set custom rate limit for key and type"""
+        if key not in self._local_buckets:
+            self._local_buckets[key] = {}
+            
+        self._local_buckets[key][limit_type] = TokenBucket(rate_limit)
+        
+    async def reset_limit(
+        self,
+        key: str,
+        limit_type: Optional[LimitType] = None
+    ) -> None:
+        """Reset rate limit for key"""
+        if limit_type:
+            # Reset specific limit type
+            if key in self._local_buckets and limit_type in self._local_buckets[key]:
+                self._local_buckets[key][limit_type] = TokenBucket(
+                    self._default_limits[limit_type]
+                )
+                
+            if self._redis:
+                await self._redis.delete(f"ratelimit:{key}:{limit_type.value}")
+        else:
+            # Reset all limit types
+            if key in self._local_buckets:
+                del self._local_buckets[key]
+                
+            if self._redis:
+                pattern = f"ratelimit:{key}:*"
+                keys = await self._redis.keys(pattern)
+                if keys:
+                    await self._redis.delete(*keys)
+
+class AdaptiveRateLimiter(RateLimiter):
+    """Rate limiter with adaptive limits based on system load"""
+    
+    def __init__(
+        self,
+        redis_url: Optional[str] = None,
+        default_window: float = 60.0,
+        default_limit: float = 100.0,
+        adaptation_interval: float = 5.0,
+        load_threshold: float = 0.8
+    ):
+        super().__init__(redis_url, default_window, default_limit)
+        self.adaptation_interval = adaptation_interval
+        self.load_threshold = load_threshold
+        self._load_history: Dict[str, list] = {}
+        self._start_load_monitoring()
+        
+    def _start_load_monitoring(self) -> None:
+        """Start background task for load monitoring"""
+        async def monitor_load():
+            while True:
+                try:
+                    await self._adapt_limits()
+                    await asyncio.sleep(self.adaptation_interval)
+                except Exception as e:
+                    logger.error(f"Load monitoring error: {str(e)}")
+                    await asyncio.sleep(1)
+                    
+        asyncio.create_task(monitor_load())
+        
+    async def _adapt_limits(self) -> None:
+        """Adapt rate limits based on system load"""
+        try:
+            # Get current system load
+            load = await self._get_system_load()
+            
+            # Store load history
+            now = time.time()
+            self._load_history[str(now)] = load
+            
+            # Remove old history
+            cutoff = now - 300  # Keep 5 minutes of history
+            self._load_history = {
+                k: v for k, v in self._load_history.items()
+                if float(k) > cutoff
+            }
+            
+            # Compute average load
+            avg_load = sum(self._load_history.values()) / len(self._load_history)
+            
+            # Adjust limits based on load
+            if avg_load > self.load_threshold:
+                # Reduce limits
+                self._adjust_limits(0.8)
+            elif avg_load < self.load_threshold * 0.5:
+                # Increase limits
+                self._adjust_limits(1.2)
+                
+        except Exception as e:
+            logger.error(f"Error adapting limits: {str(e)}")
+            
+    def _adjust_limits(self, factor: float) -> None:
+        """Adjust all rate limits by factor"""
+        for buckets in self._local_buckets.values():
+            for bucket in buckets.values():
+                bucket.rate *= factor
+                bucket.capacity *= factor
+                
+    async def _get_system_load(self) -> float:
+        """Get current system load"""
+        # TODO: Implement system load monitoring
+        return 0.5  # Placeholder
 
 # Initialize rate limiter
-rate_limiter = RateLimiter(RateLimitConfig()) 
+rate_limiter = AdaptiveRateLimiter() 

@@ -1,137 +1,275 @@
 """
-websocket.py
+WebSocket manager for FractiAI API
 
-WebSocket implementation for real-time FractiAI data streaming.
+Implements sophisticated real-time communication with support for
+channels, pub/sub patterns, and message queuing.
 """
 
 from fastapi import WebSocket, WebSocketDisconnect
-from typing import Dict, Set, Any, Optional
-import json
+from typing import Dict, Set, Optional, Any, List
 import asyncio
+import json
 import logging
-from dataclasses import dataclass, asdict
+from datetime import datetime
+from enum import Enum
+from dataclasses import dataclass
+from collections import defaultdict
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class StreamConfig:
-    """Configuration for data streaming"""
-    batch_size: int = 100
-    update_interval: float = 0.1
-    compression_level: int = 1
+class MessageType(str, Enum):
+    """Types of WebSocket messages"""
+    STATE = "state"
+    METRIC = "metric"
+    ALERT = "alert"
+    CONTROL = "control"
+    SYSTEM = "system"
 
-class ConnectionManager:
-    """Manages WebSocket connections"""
+@dataclass
+class Message:
+    """WebSocket message structure"""
+    type: MessageType
+    data: Any
+    timestamp: datetime = None
+    source: str = None
+    target: Optional[str] = None
+    
+    def to_json(self) -> str:
+        """Convert message to JSON string"""
+        return json.dumps({
+            'type': self.type,
+            'data': self.data,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'source': self.source,
+            'target': self.target
+        })
+        
+    @classmethod
+    def from_json(cls, data: str) -> 'Message':
+        """Create message from JSON string"""
+        parsed = json.loads(data)
+        return cls(
+            type=MessageType(parsed['type']),
+            data=parsed['data'],
+            timestamp=datetime.fromisoformat(parsed['timestamp'])
+            if parsed.get('timestamp') else None,
+            source=parsed.get('source'),
+            target=parsed.get('target')
+        )
+
+class Channel:
+    """Represents a communication channel"""
+    
+    def __init__(self, name: str):
+        self.name = name
+        self.connections: Set[WebSocket] = set()
+        self.message_queue: asyncio.Queue = asyncio.Queue()
+        self.last_message: Optional[Message] = None
+        
+    async def connect(self, websocket: WebSocket) -> None:
+        """Add connection to channel"""
+        await websocket.accept()
+        self.connections.add(websocket)
+        
+        # Send last message if available
+        if self.last_message:
+            await websocket.send_text(self.last_message.to_json())
+            
+    async def disconnect(self, websocket: WebSocket) -> None:
+        """Remove connection from channel"""
+        self.connections.remove(websocket)
+        
+    async def broadcast(self, message: Message) -> None:
+        """Broadcast message to all connections"""
+        self.last_message = message
+        
+        dead_connections = set()
+        for connection in self.connections:
+            try:
+                await connection.send_text(message.to_json())
+            except Exception as e:
+                logger.error(f"Error broadcasting to connection: {str(e)}")
+                dead_connections.add(connection)
+                
+        # Clean up dead connections
+        for connection in dead_connections:
+            await self.disconnect(connection)
+            
+    async def queue_message(self, message: Message) -> None:
+        """Queue message for processing"""
+        await self.message_queue.put(message)
+
+class WebSocketManager:
+    """Manages WebSocket connections and communication"""
     
     def __init__(self):
-        self.active_connections: Dict[str, WebSocket] = {}
-        self.subscriptions: Dict[str, Set[str]] = {}
+        self._channels: Dict[str, Channel] = {}
+        self._simulation_channels: Dict[str, Set[str]] = defaultdict(set)
+        self._connection_channels: Dict[WebSocket, Set[str]] = defaultdict(set)
+        self._message_handlers: Dict[MessageType, callable] = {}
         
-    async def connect(self, websocket: WebSocket, client_id: str) -> None:
-        """Accept new connection"""
-        await websocket.accept()
-        self.active_connections[client_id] = websocket
-        self.subscriptions[client_id] = set()
+        # Start message processing
+        self._start_message_processor()
         
-    def disconnect(self, client_id: str) -> None:
-        """Handle client disconnection"""
-        if client_id in self.active_connections:
-            del self.active_connections[client_id]
-        if client_id in self.subscriptions:
-            del self.subscriptions[client_id]
+    async def connect(self, websocket: WebSocket, simulation_id: str) -> None:
+        """Connect websocket to simulation channels"""
+        # Create default channels if they don't exist
+        default_channels = [
+            f"{simulation_id}:state",
+            f"{simulation_id}:metrics",
+            f"{simulation_id}:alerts"
+        ]
+        
+        for channel_name in default_channels:
+            if channel_name not in self._channels:
+                self._channels[channel_name] = Channel(channel_name)
+            self._simulation_channels[simulation_id].add(channel_name)
             
-    async def broadcast(self, message: Dict) -> None:
-        """Broadcast message to all connections"""
-        disconnected = []
-        
-        for client_id, websocket in self.active_connections.items():
-            try:
-                await websocket.send_json(message)
-            except WebSocketDisconnect:
-                disconnected.append(client_id)
-                
-        # Clean up disconnected clients
-        for client_id in disconnected:
-            self.disconnect(client_id)
+            # Connect to channel
+            channel = self._channels[channel_name]
+            await channel.connect(websocket)
+            self._connection_channels[websocket].add(channel_name)
             
-    async def send_personal_message(self, message: Dict, client_id: str) -> None:
-        """Send message to specific client"""
-        if client_id in self.active_connections:
-            try:
-                await self.active_connections[client_id].send_json(message)
-            except WebSocketDisconnect:
-                self.disconnect(client_id)
+    async def disconnect(self, websocket: WebSocket, simulation_id: str) -> None:
+        """Disconnect websocket from all channels"""
+        # Get channels for this connection
+        channels = self._connection_channels.get(websocket, set())
+        
+        # Disconnect from each channel
+        for channel_name in channels:
+            if channel_name in self._channels:
+                await self._channels[channel_name].disconnect(websocket)
                 
-    def subscribe(self, client_id: str, channel: str) -> None:
-        """Subscribe client to channel"""
-        if client_id in self.subscriptions:
-            self.subscriptions[client_id].add(channel)
+        # Clean up
+        if websocket in self._connection_channels:
+            del self._connection_channels[websocket]
             
-    def unsubscribe(self, client_id: str, channel: str) -> None:
-        """Unsubscribe client from channel"""
-        if client_id in self.subscriptions:
-            self.subscriptions[client_id].discard(channel)
+    async def broadcast_to_simulation(
+        self,
+        simulation_id: str,
+        data: Any,
+        message_type: MessageType = MessageType.STATE
+    ) -> None:
+        """Broadcast message to all simulation channels"""
+        channels = self._simulation_channels.get(simulation_id, set())
+        
+        message = Message(
+            type=message_type,
+            data=data,
+            timestamp=datetime.utcnow(),
+            source=simulation_id
+        )
+        
+        for channel_name in channels:
+            if channel_name in self._channels:
+                await self._channels[channel_name].broadcast(message)
+                
+    async def send_to_channel(
+        self,
+        channel_name: str,
+        data: Any,
+        message_type: MessageType = MessageType.STATE
+    ) -> None:
+        """Send message to specific channel"""
+        if channel_name not in self._channels:
+            return
             
-    async def broadcast_to_channel(self, channel: str, message: Dict) -> None:
-        """Broadcast message to channel subscribers"""
-        for client_id, subs in self.subscriptions.items():
-            if channel in subs:
-                await self.send_personal_message(message, client_id)
-
-class DataStreamer:
-    """Handles real-time data streaming"""
-    
-    def __init__(self, config: StreamConfig):
-        self.config = config
-        self.manager = ConnectionManager()
-        self.data_processors: Dict[str, Any] = {}
-        self._running = False
+        message = Message(
+            type=message_type,
+            data=data,
+            timestamp=datetime.utcnow()
+        )
         
-    async def start(self) -> None:
-        """Start data streaming"""
-        self._running = True
-        asyncio.create_task(self._stream_loop())
+        await self._channels[channel_name].broadcast(message)
         
-    async def stop(self) -> None:
-        """Stop data streaming"""
-        self._running = False
+    def register_handler(
+        self,
+        message_type: MessageType,
+        handler: callable
+    ) -> None:
+        """Register message handler for type"""
+        self._message_handlers[message_type] = handler
         
-    async def _stream_loop(self) -> None:
-        """Main streaming loop"""
-        while self._running:
-            try:
-                # Process and stream data
-                for processor_id, processor in self.data_processors.items():
-                    data = await processor.get_data()
-                    if data:
-                        await self.manager.broadcast_to_channel(
-                            processor_id,
-                            self._format_data(data)
-                        )
-                        
-                await asyncio.sleep(self.config.update_interval)
+    def _start_message_processor(self) -> None:
+        """Start background task for processing messages"""
+        async def process_messages():
+            while True:
+                try:
+                    # Process messages from all channels
+                    for channel in self._channels.values():
+                        while not channel.message_queue.empty():
+                            message = await channel.message_queue.get()
+                            
+                            # Handle message
+                            if message.type in self._message_handlers:
+                                try:
+                                    await self._message_handlers[message.type](message)
+                                except Exception as e:
+                                    logger.error(
+                                        f"Error handling message: {str(e)}"
+                                    )
+                                    
+                    await asyncio.sleep(0.1)
+                except Exception as e:
+                    logger.error(f"Error in message processor: {str(e)}")
+                    await asyncio.sleep(1)
+                    
+        asyncio.create_task(process_messages())
+        
+    async def handle_client_message(
+        self,
+        websocket: WebSocket,
+        message: str
+    ) -> None:
+        """Handle message from client"""
+        try:
+            # Parse message
+            parsed_message = Message.from_json(message)
+            
+            # Queue for processing if handler exists
+            if parsed_message.type in self._message_handlers:
+                channels = self._connection_channels.get(websocket, set())
+                if channels:
+                    # Use first channel (could be more sophisticated)
+                    channel_name = next(iter(channels))
+                    await self._channels[channel_name].queue_message(parsed_message)
+                    
+        except Exception as e:
+            logger.error(f"Error handling client message: {str(e)}")
+            
+    async def create_channel(self, name: str) -> Channel:
+        """Create new communication channel"""
+        if name not in self._channels:
+            self._channels[name] = Channel(name)
+        return self._channels[name]
+        
+    async def delete_channel(self, name: str) -> None:
+        """Delete communication channel"""
+        if name in self._channels:
+            channel = self._channels[name]
+            
+            # Disconnect all connections
+            for connection in list(channel.connections):
+                await channel.disconnect(connection)
                 
-            except Exception as e:
-                logger.error(f"Streaming error: {str(e)}")
-                await asyncio.sleep(1)  # Error cooldown
+            # Remove from simulations
+            for simulation_channels in self._simulation_channels.values():
+                simulation_channels.discard(name)
                 
-    def _format_data(self, data: Any) -> Dict:
-        """Format data for streaming"""
-        if hasattr(data, '__dict__'):
-            data = asdict(data)
+            # Remove channel
+            del self._channels[name]
+            
+    async def get_channel_status(self) -> Dict[str, Dict[str, Any]]:
+        """Get status of all channels"""
         return {
-            'timestamp': datetime.utcnow().isoformat(),
-            'data': data
+            name: {
+                'connections': len(channel.connections),
+                'queue_size': channel.message_queue.qsize(),
+                'last_message_time': channel.last_message.timestamp.isoformat()
+                if channel.last_message else None
+            }
+            for name, channel in self._channels.items()
         }
-        
-    def add_processor(self, processor_id: str, processor: Any) -> None:
-        """Add data processor"""
-        self.data_processors[processor_id] = processor
-        
-    def remove_processor(self, processor_id: str) -> None:
-        """Remove data processor"""
-        if processor_id in self.data_processors:
-            del self.data_processors[processor_id]
 
-# Initialize streamer
-streamer = DataStreamer(StreamConfig()) 
+# Initialize WebSocket manager
+ws_manager = WebSocketManager() 

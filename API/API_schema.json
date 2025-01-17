@@ -1,8 +1,8 @@
 {
-  "openapi": "3.0.0",
+  "openapi": "3.0.3",
   "info": {
     "title": "FractiAI API",
-    "description": "API for interacting with FractiAI's fractal intelligence system",
+    "description": "API for interacting with FractiAI system, providing access to simulations, analysis, and optimization capabilities",
     "version": "1.0.0"
   },
   "servers": [
@@ -11,32 +11,428 @@
       "description": "Production server"
     },
     {
-      "url": "https://staging.fractiai.com/v1",
+      "url": "https://staging-api.fractiai.com/v1",
       "description": "Staging server"
     }
   ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "SimulationConfig": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Name of the simulation"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the simulation"
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DomainConfig"
+            }
+          },
+          "quantum_config": {
+            "$ref": "#/components/schemas/QuantumConfig"
+          },
+          "field_config": {
+            "$ref": "#/components/schemas/FieldConfig"
+          },
+          "resonance_config": {
+            "$ref": "#/components/schemas/ResonanceConfig"
+          }
+        },
+        "required": ["name", "domains"]
+      },
+      "DomainConfig": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["natural", "government", "technology", "socioeconomic"]
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": ["type"]
+      },
+      "QuantumConfig": {
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "entanglement_threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "coherence_threshold": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "FieldConfig": {
+        "type": "object",
+        "properties": {
+          "coupling_strength": {
+            "type": "number",
+            "minimum": 0
+          },
+          "correlation_length": {
+            "type": "number",
+            "minimum": 0
+          },
+          "field_resolution": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "ResonanceConfig": {
+        "type": "object",
+        "properties": {
+          "sensitivity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "entrainment_rate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "harmonic_depth": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "SimulationState": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["initializing", "running", "paused", "completed", "error"]
+          },
+          "current_step": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "domain_states": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DomainState"
+            }
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/SimulationMetrics"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DomainState": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "state": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "SimulationMetrics": {
+        "type": "object",
+        "properties": {
+          "coherence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "resonance": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "field_energy": {
+            "type": "number"
+          },
+          "entanglement": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "AnalysisRequest": {
+        "type": "object",
+        "properties": {
+          "simulation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "analysis_type": {
+            "type": "string",
+            "enum": ["quantum", "field", "resonance", "pattern", "emergence"]
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": ["simulation_id", "analysis_type"]
+      },
+      "AnalysisResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "simulation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "analysis_type": {
+            "type": "string"
+          },
+          "results": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OptimizationRequest": {
+        "type": "object",
+        "properties": {
+          "simulation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "objectives": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "metric": {
+                  "type": "string"
+                },
+                "target": {
+                  "type": "number"
+                },
+                "weight": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "parameter": {
+                  "type": "string"
+                },
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "required": ["simulation_id", "objectives"]
+      },
+      "OptimizationResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "simulation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "error"]
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "objective_values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    }
+  },
   "paths": {
-    "/process": {
+    "/simulations": {
       "post": {
-        "summary": "Process input through FractiAI system",
-        "description": "Transform input data using fractal patterns and SAUUHUPP principles",
+        "summary": "Create new simulation",
+        "operationId": "createSimulation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ProcessInput"
+                "$ref": "#/components/schemas/SimulationConfig"
               }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Successful processing",
+          "201": {
+            "description": "Simulation created",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProcessOutput"
+                  "$ref": "#/components/schemas/SimulationState"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List simulations",
+        "operationId": "listSimulations",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["initializing", "running", "paused", "completed", "error"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of simulations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SimulationState"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
                 }
               }
             }
@@ -44,27 +440,230 @@
         }
       }
     },
-    "/analyze": {
+    "/simulations/{simulation_id}": {
+      "get": {
+        "summary": "Get simulation details",
+        "operationId": "getSimulation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "simulation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Simulation details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationState"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Simulation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete simulation",
+        "operationId": "deleteSimulation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "simulation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Simulation deleted"
+          },
+          "404": {
+            "description": "Simulation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/simulations/{simulation_id}/control": {
       "post": {
-        "summary": "Analyze patterns using FractiScope",
-        "description": "Perform deep pattern analysis across dimensions",
+        "summary": "Control simulation",
+        "operationId": "controlSimulation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "simulation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnalyzeInput"
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": ["start", "pause", "resume", "stop"]
+                  },
+                  "steps": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": ["action"]
               }
             }
           }
         },
         "responses": {
           "200": {
+            "description": "Control action applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationState"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Simulation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis": {
+      "post": {
+        "summary": "Request analysis",
+        "operationId": "requestAnalysis",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Analysis request accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/{analysis_id}": {
+      "get": {
+        "summary": "Get analysis results",
+        "operationId": "getAnalysis",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
             "description": "Analysis results",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AnalyzeOutput"
+                  "$ref": "#/components/schemas/AnalysisResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Analysis not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -74,25 +673,40 @@
     },
     "/optimize": {
       "post": {
-        "summary": "Optimize system parameters",
-        "description": "Optimize FractiAI components using fractal patterns",
+        "summary": "Request optimization",
+        "operationId": "requestOptimization",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OptimizeInput"
+                "$ref": "#/components/schemas/OptimizationRequest"
               }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Optimization results",
+          "202": {
+            "description": "Optimization request accepted",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OptimizeOutput"
+                  "$ref": "#/components/schemas/OptimizationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -100,179 +714,45 @@
         }
       }
     },
-    "/metrics": {
+    "/optimize/{optimization_id}": {
       "get": {
-        "summary": "Get system metrics",
-        "description": "Retrieve performance and health metrics",
+        "summary": "Get optimization results",
+        "operationId": "getOptimization",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
-            "name": "component",
-            "in": "query",
-            "description": "Specific component to get metrics for",
-            "required": false,
+            "name": "optimization_id",
+            "in": "path",
+            "required": true,
             "schema": {
-              "type": "string"
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "System metrics",
+            "description": "Optimization results",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MetricsOutput"
+                  "$ref": "#/components/schemas/OptimizationResult"
                 }
               }
             }
-          }
-        }
-      }
-    }
-  },
-  "components": {
-    "schemas": {
-      "ProcessInput": {
-        "type": "object",
-        "required": ["data", "config"],
-        "properties": {
-          "data": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            },
-            "description": "Input data array"
           },
-          "config": {
-            "type": "object",
-            "properties": {
-              "dimensions": {
-                "type": "integer",
-                "minimum": 1,
-                "default": 3
-              },
-              "recursive_depth": {
-                "type": "integer",
-                "minimum": 1,
-                "default": 5
+          "404": {
+            "description": "Optimization not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
               }
-            }
-          }
-        }
-      },
-      "ProcessOutput": {
-        "type": "object",
-        "properties": {
-          "result": {
-            "type": "array",
-            "items": {
-              "type": "number"
-            }
-          },
-          "metrics": {
-            "type": "object",
-            "properties": {
-              "coherence": {
-                "type": "number"
-              },
-              "efficiency": {
-                "type": "number"
-              }
-            }
-          }
-        }
-      },
-      "AnalyzeInput": {
-        "type": "object",
-        "required": ["patterns"],
-        "properties": {
-          "patterns": {
-            "type": "array",
-            "items": {
-              "type": "array",
-              "items": {
-                "type": "number"
-              }
-            }
-          },
-          "config": {
-            "type": "object",
-            "properties": {
-              "analysis_depth": {
-                "type": "integer",
-                "default": 3
-              }
-            }
-          }
-        }
-      },
-      "AnalyzeOutput": {
-        "type": "object",
-        "properties": {
-          "fractal_metrics": {
-            "type": "object",
-            "properties": {
-              "dimension": {
-                "type": "number"
-              },
-              "complexity": {
-                "type": "number"
-              }
-            }
-          },
-          "patterns": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            }
-          }
-        }
-      },
-      "OptimizeInput": {
-        "type": "object",
-        "required": ["parameters", "objective"],
-        "properties": {
-          "parameters": {
-            "type": "object"
-          },
-          "objective": {
-            "type": "string"
-          },
-          "constraints": {
-            "type": "array",
-            "items": {
-              "type": "object"
-            }
-          }
-        }
-      },
-      "OptimizeOutput": {
-        "type": "object",
-        "properties": {
-          "optimal_parameters": {
-            "type": "object"
-          },
-          "objective_value": {
-            "type": "number"
-          },
-          "convergence": {
-            "type": "object"
-          }
-        }
-      },
-      "MetricsOutput": {
-        "type": "object",
-        "properties": {
-          "system_health": {
-            "type": "number"
-          },
-          "component_metrics": {
-            "type": "object"
-          },
-          "alerts": {
-            "type": "array",
-            "items": {
-              "type": "object"
             }
           }
         }

@@ -1,29 +1,31 @@
 """
-main.py
+Main FastAPI application for FractiAI
 
-FastAPI implementation of the FractiAI API endpoints.
+Implements comprehensive REST and WebSocket API endpoints for
+interacting with the FractiAI system.
 """
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, List, Optional
-import numpy as np
+from typing import Dict, List, Optional, Any
+import uuid
 import logging
-from pydantic import BaseModel
+from datetime import datetime
 
-from Methods.Method_Integrator import MethodIntegrator, UnipixelConfig
-from Methods.FractiAnalytics import FractiAnalytics, AnalyticsConfig
-from Methods.FractiMetrics import FractiMetrics, MetricsConfig
+from .auth import AuthManager, User
+from .rate_limiter import RateLimiter
+from .websocket import ws_manager, MessageType
+from .monitoring import MetricsCollector
 
-logger = logging.getLogger(__name__)
-
+# Initialize FastAPI app
 app = FastAPI(
     title="FractiAI API",
-    description="API for FractiAI's fractal intelligence system",
+    description="API for interacting with FractiAI system",
     version="1.0.0"
 )
 
-# Configure CORS
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,128 +34,273 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize core components
-integrator = MethodIntegrator()
-analytics = FractiAnalytics(AnalyticsConfig())
-metrics = FractiMetrics(MetricsConfig())
+# Initialize components
+auth_manager = AuthManager()
+rate_limiter = RateLimiter()
+metrics_collector = MetricsCollector()
 
-class ProcessRequest(BaseModel):
-    data: List[float]
-    config: Dict[str, any]
+# OAuth2 scheme
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-class AnalyzeRequest(BaseModel):
-    patterns: List[List[float]]
-    config: Optional[Dict[str, any]]
-
-class OptimizeRequest(BaseModel):
-    parameters: Dict[str, any]
-    objective: str
-    constraints: Optional[List[Dict]]
-
-@app.post("/process")
-async def process_data(request: ProcessRequest, background_tasks: BackgroundTasks):
-    """Process input through FractiAI system"""
-    try:
-        # Convert input to numpy array
-        input_data = np.array(request.data)
-        
-        # Process through integrator
-        output = integrator.process_input(input_data)
-        
-        # Update metrics in background
-        background_tasks.add_task(
-            metrics.update_component_metrics,
-            "processor",
-            {"efficiency": float(np.mean(output))}
+# Dependency for getting current user
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
+    """Get current authenticated user"""
+    user = await auth_manager.get_current_user(token)
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication credentials"
         )
-        
-        return {
-            "result": output.tolist(),
-            "metrics": {
-                "coherence": float(np.mean(np.abs(np.corrcoef(input_data, output)))),
-                "efficiency": float(np.mean(output))
-            }
-        }
-        
-    except Exception as e:
-        logger.error(f"Processing error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    return user
 
-@app.post("/analyze")
-async def analyze_patterns(request: AnalyzeRequest):
-    """Analyze patterns using FractiScope"""
+# Rate limiting dependency
+async def check_rate_limit(user: User = Depends(get_current_user)):
+    """Check rate limit for current user"""
+    if not await rate_limiter.check_limit(user.username):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded"
+        )
+
+@app.post("/simulations")
+async def create_simulation(
+    config: Dict[str, Any],
+    user: User = Depends(get_current_user),
+    _: None = Depends(check_rate_limit)
+):
+    """Create new simulation"""
     try:
-        # Convert patterns to numpy arrays
-        patterns = [np.array(p) for p in request.patterns]
+        # Generate simulation ID
+        simulation_id = str(uuid.uuid4())
         
-        # Analyze patterns
-        analysis = analytics.analyze_patterns({
-            f"pattern_{i}": p for i, p in enumerate(patterns)
-        })
+        # Initialize simulation
+        # TODO: Implement simulation initialization
         
         return {
-            "fractal_metrics": analysis['global_patterns'],
-            "patterns": analysis['dimensional_analysis']
+            "id": simulation_id,
+            "status": "initializing",
+            "created_at": datetime.utcnow().isoformat()
         }
-        
     except Exception as e:
-        logger.error(f"Analysis error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
+@app.get("/simulations")
+async def list_simulations(
+    status: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+    user: User = Depends(get_current_user),
+    _: None = Depends(check_rate_limit)
+):
+    """List simulations"""
+    try:
+        # Get simulations
+        # TODO: Implement simulation listing
+        
+        return {
+            "items": [],
+            "total": 0
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
+@app.get("/simulations/{simulation_id}")
+async def get_simulation(
+    simulation_id: str,
+    user: User = Depends(get_current_user),
+    _: None = Depends(check_rate_limit)
+):
+    """Get simulation details"""
+    try:
+        # Get simulation
+        # TODO: Implement simulation retrieval
+        
+        return {
+            "id": simulation_id,
+            "status": "running",
+            "current_step": 0
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+
+@app.delete("/simulations/{simulation_id}")
+async def delete_simulation(
+    simulation_id: str,
+    user: User = Depends(get_current_user),
+    _: None = Depends(check_rate_limit)
+):
+    """Delete simulation"""
+    try:
+        # Delete simulation
+        # TODO: Implement simulation deletion
+        
+        return None
+    except Exception as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+
+@app.post("/simulations/{simulation_id}/control")
+async def control_simulation(
+    simulation_id: str,
+    action: Dict[str, Any],
+    user: User = Depends(get_current_user),
+    _: None = Depends(check_rate_limit)
+):
+    """Control simulation"""
+    try:
+        # Control simulation
+        # TODO: Implement simulation control
+        
+        return {
+            "id": simulation_id,
+            "status": action["action"],
+            "current_step": 0
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+
+@app.post("/analysis")
+async def request_analysis(
+    request: Dict[str, Any],
+    user: User = Depends(get_current_user),
+    _: None = Depends(check_rate_limit)
+):
+    """Request analysis"""
+    try:
+        # Generate analysis ID
+        analysis_id = str(uuid.uuid4())
+        
+        # Start analysis
+        # TODO: Implement analysis
+        
+        return {
+            "id": analysis_id,
+            "simulation_id": request["simulation_id"],
+            "analysis_type": request["analysis_type"],
+            "created_at": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
+@app.get("/analysis/{analysis_id}")
+async def get_analysis(
+    analysis_id: str,
+    user: User = Depends(get_current_user),
+    _: None = Depends(check_rate_limit)
+):
+    """Get analysis results"""
+    try:
+        # Get analysis results
+        # TODO: Implement analysis retrieval
+        
+        return {
+            "id": analysis_id,
+            "results": {}
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
 
 @app.post("/optimize")
-async def optimize_system(request: OptimizeRequest):
-    """Optimize system parameters"""
+async def request_optimization(
+    request: Dict[str, Any],
+    user: User = Depends(get_current_user),
+    _: None = Depends(check_rate_limit)
+):
+    """Request optimization"""
     try:
-        # Create objective function
-        def objective_fn(x):
-            return -np.sum(x**2)  # Example objective
-            
-        # Convert parameters to numpy array
-        initial_state = np.array(list(request.parameters.values()))
+        # Generate optimization ID
+        optimization_id = str(uuid.uuid4())
         
-        # Optimize
-        optimized_state, score = integrator.optimize_system(
-            {"main": initial_state},
-            {"main": objective_fn}
-        )
+        # Start optimization
+        # TODO: Implement optimization
         
         return {
-            "optimal_parameters": {
-                k: float(v) for k, v in zip(request.parameters.keys(), 
-                                          optimized_state['main'])
-            },
-            "objective_value": float(score),
-            "convergence": {
-                "iterations": 100,
-                "final_error": float(abs(score))
-            }
+            "id": optimization_id,
+            "simulation_id": request["simulation_id"],
+            "status": "running",
+            "created_at": datetime.utcnow().isoformat()
         }
-        
     except Exception as e:
-        logger.error(f"Optimization error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
 
-@app.get("/metrics")
-async def get_metrics(component: Optional[str] = None):
-    """Get system metrics"""
+@app.get("/optimize/{optimization_id}")
+async def get_optimization(
+    optimization_id: str,
+    user: User = Depends(get_current_user),
+    _: None = Depends(check_rate_limit)
+):
+    """Get optimization results"""
     try:
-        if component:
-            return metrics.get_component_metrics(component)
-        else:
-            return metrics.get_system_metrics()
+        # Get optimization results
+        # TODO: Implement optimization retrieval
+        
+        return {
+            "id": optimization_id,
+            "status": "completed",
+            "parameters": {},
+            "objective_values": {}
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+
+@app.websocket("/ws/{simulation_id}")
+async def websocket_endpoint(websocket: WebSocket, simulation_id: str):
+    """WebSocket endpoint for real-time updates"""
+    try:
+        # Connect to WebSocket
+        await ws_manager.connect(websocket, simulation_id)
+        
+        try:
+            while True:
+                # Receive message
+                data = await websocket.receive_text()
+                
+                # Handle message
+                await ws_manager.handle_client_message(websocket, data)
+                
+        except WebSocketDisconnect:
+            # Disconnect on WebSocket disconnect
+            await ws_manager.disconnect(websocket, simulation_id)
             
     except Exception as e:
-        logger.error(f"Metrics error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logging.error(f"WebSocket error: {str(e)}")
+        if websocket.client_state.connected:
+            await websocket.close()
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize system on startup"""
-    config = UnipixelConfig()
-    integrator.initialize_system(config)
-    logger.info("FractiAI API initialized")
+    """Startup event handler"""
+    # Start metrics collection
+    await metrics_collector.start()
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("FractiAI API shutting down") 
+    """Shutdown event handler"""
+    # Stop metrics collection
+    await metrics_collector.stop() 
