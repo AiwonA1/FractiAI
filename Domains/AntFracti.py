@@ -1,158 +1,183 @@
 """
 AntFracti.py
 
-Implements FractiAI principles for ant colony optimization and swarm intelligence,
-demonstrating emergent behavior and self-organization through fractal patterns.
+Implements advanced FractiAI principles for ant colony optimization and swarm intelligence,
+demonstrating emergent behavior and self-organization through fractal patterns and quantum-inspired dynamics.
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Union
 from dataclasses import dataclass
 import logging
 from scipy.spatial.distance import cdist
+from scipy.stats import entropy
+from scipy.ndimage import gaussian_filter
+from collections import deque
 
 logger = logging.getLogger(__name__)
 
-@dataclass
+@dataclass 
 class AntConfig:
-    """Configuration for ant colony system"""
+    """Configuration for advanced ant colony system"""
+    # Colony parameters
     colony_size: int = 100
+    sub_colonies: int = 3
+    caste_types: int = 4  # Different ant specializations
+    
+    # Pheromone parameters
+    pheromone_types: int = 3  # Multiple pheromone signals
     pheromone_decay: float = 0.1
+    pheromone_diffusion: float = 0.05
     pheromone_strength: float = 1.0
+    
+    # Behavioral parameters
     exploration_rate: float = 0.2
     local_awareness: float = 0.7
+    social_influence: float = 0.3
+    memory_length: int = 50
+    quantum_randomness: float = 0.1
+    
+    # Environment parameters
     max_steps: int = 1000
+    resource_types: int = 3
+    terrain_complexity: float = 0.5
+    weather_effects: bool = True
+    
+    # Learning parameters
+    adaptation_rate: float = 0.01
+    reinforcement_factor: float = 0.2
+    collective_memory: bool = True
+
+@dataclass
+class AntCaste:
+    """Defines specialized ant roles"""
+    name: str
+    pheromone_sensitivity: float
+    exploration_bias: float
+    load_capacity: float
+    energy_efficiency: float
+    communication_range: float
+
+class QuantumPheromoneField:
+    """Implements quantum-inspired pheromone dynamics"""
+    
+    def __init__(self, world_size: Tuple[int, int], n_types: int):
+        self.fields = np.zeros((n_types, *world_size), dtype=np.complex128)
+        self.coherence = np.ones(n_types)
+        self.interference_patterns = np.zeros_like(self.fields)
+        
+    def update(self, positions: np.ndarray, strengths: np.ndarray, 
+              config: AntConfig) -> None:
+        """Update quantum pheromone fields"""
+        # Apply quantum wave function evolution
+        self.fields *= np.exp(1j * config.pheromone_decay)
+        
+        # Add new pheromone contributions with quantum uncertainty
+        for pos, strength in zip(positions, strengths):
+            phase = 2 * np.pi * np.random.random()
+            quantum_strength = strength * np.exp(1j * phase)
+            pos = pos.astype(int)
+            if self._valid_position(pos):
+                self.fields[:, pos[0], pos[1]] += quantum_strength
+                
+        # Apply diffusion and decoherence
+        self._apply_quantum_effects(config)
+        
+    def _apply_quantum_effects(self, config: AntConfig) -> None:
+        """Apply quantum mechanical effects to pheromone fields"""
+        for i in range(len(self.fields)):
+            # Quantum diffusion
+            self.fields[i] = gaussian_filter(self.fields[i], sigma=config.pheromone_diffusion)
+            
+            # Decoherence
+            self.coherence[i] *= (1 - config.pheromone_decay)
+            
+            # Calculate interference patterns
+            self.interference_patterns[i] = np.abs(self.fields[i])**2
+            
+    def _valid_position(self, pos: np.ndarray) -> bool:
+        """Check if position is within field bounds"""
+        return all(0 <= p < s for p, s in zip(pos, self.fields.shape[1:]))
 
 class AntAgent:
-    """Individual ant agent with fractal behavior patterns"""
+    """Individual ant agent with quantum-aware fractal behavior patterns"""
     
-    def __init__(self, ant_id: int, position: np.ndarray):
+    def __init__(self, ant_id: int, position: np.ndarray, caste: AntCaste):
         self.ant_id = ant_id
         self.position = position
-        self.path_history = []
-        self.pheromone_contribution = 0.0
-        self.state = np.zeros(3)  # Internal state vector
+        self.caste = caste
+        self.path_history = deque(maxlen=50)
+        self.quantum_state = np.random.random(3) + 1j * np.random.random(3)
+        self.carried_resources = np.zeros(3)
+        self.energy = 1.0
+        self.experience = {}
         
-    def move(self, pheromone_map: np.ndarray, 
-            food_sources: np.ndarray,
-            config: AntConfig) -> Tuple[np.ndarray, float]:
-        """Move ant based on pheromones and food sources"""
-        # Store current position
+    def move(self, pheromone_field: QuantumPheromoneField,
+            resources: Dict[str, np.ndarray],
+            colony_state: Dict[str, Any],
+            config: AntConfig) -> Tuple[np.ndarray, np.ndarray]:
+        """Execute quantum-influenced movement"""
         self.path_history.append(self.position.copy())
         
-        # Compute move direction
-        direction = self._compute_direction(
-            pheromone_map,
-            food_sources,
-            config
-        )
+        # Compute quantum-classical hybrid direction
+        classical_direction = self._compute_classical_direction(
+            pheromone_field, resources, colony_state, config)
+        quantum_direction = self._compute_quantum_direction(config)
         
-        # Update position
-        new_position = self.position + direction
-        self.position = new_position
+        # Combine directions with quantum weighting
+        direction = (1 - config.quantum_randomness) * classical_direction + \
+                   config.quantum_randomness * quantum_direction
+                   
+        # Update position with energy constraints
+        movement_cost = np.linalg.norm(direction) * (1 / self.caste.energy_efficiency)
+        if self.energy >= movement_cost:
+            self.position += direction
+            self.energy -= movement_cost
+            
+        # Update quantum state
+        self._evolve_quantum_state(config)
         
-        # Compute pheromone contribution
-        self.pheromone_contribution = self._compute_pheromone(direction, config)
-        
-        return new_position, self.pheromone_contribution
+        return self.position, self._compute_pheromone_contribution(direction, config)
     
-    def _compute_direction(self, pheromone_map: np.ndarray,
-                         food_sources: np.ndarray,
-                         config: AntConfig) -> np.ndarray:
-        """Compute movement direction"""
-        # Get local pheromone information
-        local_pheromones = self._get_local_pheromones(pheromone_map)
+    def _compute_classical_direction(self, pheromone_field: QuantumPheromoneField,
+                                  resources: Dict[str, np.ndarray],
+                                  colony_state: Dict[str, Any],
+                                  config: AntConfig) -> np.ndarray:
+        """Compute classical movement components"""
+        # Get pheromone influence
+        pheromone_direction = self._get_pheromone_gradient(pheromone_field)
         
-        # Get direction to nearest food
-        food_direction = self._get_food_direction(food_sources)
+        # Get resource influence
+        resource_direction = self._get_resource_direction(resources)
         
-        # Combine influences with exploration
-        if np.random.random() < config.exploration_rate:
-            # Random exploration
-            direction = np.random.randn(2)
-        else:
-            # Weighted combination of pheromones and food direction
-            direction = (config.local_awareness * local_pheromones +
-                       (1 - config.local_awareness) * food_direction)
-            
-        # Normalize direction
-        norm = np.linalg.norm(direction)
-        if norm > 0:
-            direction /= norm
-            
-        return direction
+        # Get social influence
+        social_direction = self._get_social_influence(colony_state)
+        
+        # Combine influences based on caste and state
+        direction = (self.caste.pheromone_sensitivity * pheromone_direction +
+                    self.caste.exploration_bias * resource_direction +
+                    config.social_influence * social_direction)
+        
+        return self._normalize_direction(direction)
     
-    def _get_local_pheromones(self, pheromone_map: np.ndarray) -> np.ndarray:
-        """Get local pheromone gradient"""
-        pos = self.position.astype(int)
-        window_size = 3
+    def _compute_quantum_direction(self, config: AntConfig) -> np.ndarray:
+        """Compute quantum-influenced movement component"""
+        # Generate quantum random walk
+        phase = np.angle(self.quantum_state[0])
+        amplitude = np.abs(self.quantum_state[1])
         
-        # Get local window
-        x_min = max(0, pos[0] - window_size)
-        x_max = min(pheromone_map.shape[0], pos[0] + window_size + 1)
-        y_min = max(0, pos[1] - window_size)
-        y_max = min(pheromone_map.shape[1], pos[1] + window_size + 1)
+        direction = np.array([
+            amplitude * np.cos(phase),
+            amplitude * np.sin(phase)
+        ])
         
-        local_window = pheromone_map[x_min:x_max, y_min:y_max]
-        
-        # Compute gradient
-        gradient_y, gradient_x = np.gradient(local_window)
-        
-        return np.array([np.mean(gradient_x), np.mean(gradient_y)])
+        return self._normalize_direction(direction)
     
-    def _get_food_direction(self, food_sources: np.ndarray) -> np.ndarray:
-        """Compute direction to nearest food source"""
-        if len(food_sources) == 0:
-            return np.zeros(2)
-            
-        # Compute distances to all food sources
-        distances = cdist([self.position], food_sources)
-        nearest_idx = np.argmin(distances)
-        
-        # Get direction to nearest food
-        direction = food_sources[nearest_idx] - self.position
-        
-        # Normalize
-        norm = np.linalg.norm(direction)
-        if norm > 0:
-            direction /= norm
-            
-        return direction
-    
-    def _compute_pheromone(self, direction: np.ndarray, 
-                          config: AntConfig) -> float:
-        """Compute pheromone contribution"""
-        # Base pheromone on movement efficiency
-        movement_efficiency = np.linalg.norm(direction)
-        return config.pheromone_strength * movement_efficiency
-
-class AntColony:
-    """Ant colony system implementing fractal-based swarm intelligence"""
-    
-    def __init__(self, config: AntConfig, world_size: Tuple[int, int]):
-        self.config = config
-        self.world_size = world_size
-        self.ants: List[AntAgent] = []
-        self.pheromone_map = np.zeros(world_size)
-        self.food_sources = np.array([])
-        self.metrics = []
-        
-    def initialize_colony(self, nest_position: np.ndarray) -> None:
-        """Initialize ant colony"""
-        for i in range(self.config.colony_size):
-            position = nest_position + np.random.randn(2) * 0.1
-            self.ants.append(AntAgent(i, position))
-            
-    def add_food_source(self, position: np.ndarray, quantity: float) -> None:
-        """Add food source to environment"""
-        if self.food_sources.size == 0:
-            self.food_sources = position.reshape(1, -1)
-        else:
-            self.food_sources = np.vstack([self.food_sources, position])
-            
-    def simulate(self, steps: int) -> Dict[str, Any]:
-        """Run colony simulation"""
-        simulation_metrics = []
+    def _evolve_quantum_state(self, config: AntConfig) -> None:
+        """Evolve internal quantum state"""
+        # Apply quantum walk operator
+        phase_shift = np.exp(1j * np.pi * config.quantum_randomness)
+        self.quantum_state *= phase_shift
         
         for step in range(steps):
             step_metrics = self._simulate_step()
