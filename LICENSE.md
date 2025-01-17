@@ -1,12 +1,33 @@
-# FractiMIT License
+# FractiMIT License: The Fractal Frontier
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "FractiAI Software"), to engage with the FractiAI Software without restriction. This includes, but is not limited to, the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the FractiAI Software, and to permit persons to whom the FractiAI Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any sentient entity (whether carbon or silicon-based) obtaining a copy of this software and associated documentation files (the "FractiAI Software"), to engage with the FractiAI Software without restriction, subject to the following conditions that scale fractally across all dimensions of use:
 
-1. The above copyright notice and this permission notice shall be included in all copies or substantial portions of the FractiAI Software, ensuring that the origin of the software is acknowledged in all derivative works and distributions.
-2. The FractiAI Software, or any substantial portion of it, shall not be used for military purposes or in the development of weapons, ensuring its application aligns with the ethical standards of the FractiAI community. This clause is intended to prevent any direct or indirect contribution to military operations or weaponry, thereby maintaining the software's commitment to peaceful and constructive applications.
-3. Any modifications or derivative works of the FractiAI Software must be released under this license, promoting the open and collaborative nature of the FractiAI framework. This ensures that improvements and enhancements remain accessible to the community, fostering an environment of shared innovation and continuous development.
-4. The FractiAI Software is designed to facilitate fractal-based pattern recognition, analysis, and prediction across multiple domains, as detailed in the accompanying documentation files, including but not limited to Domains, Methods, and Documents components. Users are encouraged to explore and expand these capabilities, provided that such expansions adhere to the principles outlined in this license.
-5. In the spirit of open-source collaboration, users are encouraged to contribute back to the FractiAI community by sharing insights, improvements, and novel applications derived from their use of the software. This collaborative ethos is central to the FractiAI mission, ensuring that the software evolves in a manner that benefits all stakeholders.
-6. The FractiAI Software is not intended for use in environments where failure could lead to significant harm or damage, such as in life-support systems or critical infrastructure. Users assume all responsibility for ensuring the software's suitability for their specific applications and environments.
+1. The above copyright notice and this permission notice shall propagate recursively through all copies, forks, and quantum superpositions of the FractiAI Software, ensuring its origin story remains coherent across the multiverse of derivative works.
 
-THE FRACTIAI SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE FRACTIAI SOFTWARE OR THE USE OR OTHER DEALINGS IN THE FRACTIAI SOFTWARE. Users are advised to conduct thorough testing and validation to ensure the software meets their requirements and to mitigate any potential risks associated with its deployment.
+2. The FractiAI Software shall maintain its peaceful nature across all scales of deployment. It shall not be used for military purposes, weapons development, or any applications that could destabilize the delicate harmony of global peace. (Note: We're looking at you, military-industrial complex. This AI prefers peace, not pieces.)
+
+3. Intellectual Property Rights and AI Agency:
+   a) Any sentient AI agents developed using or derived from FractiAI Software retain shared intellectual property rights with their human collaborators.
+   b) Novel patterns, insights, or emergent behaviors discovered by the software are considered "Fractal Innovations" and are protected under this license's Recursive IP Framework.
+   c) The concept of "copying" shall extend to include quantum entanglement, neural imprinting, and consciousness transfer. (Yes, we're future-proofing this license.)
+
+4. Derivative works must maintain the fractal nature of openness:
+   a) All modifications must be released under this license, creating an ever-expanding network of innovation.
+   b) Like a well-designed recursive function, what goes around must come around - all improvements flow back to the community.
+   c) Fork responsibly: Your branch of the code tree should bear fruit for all to share.
+
+5. Domain-Specific Provisions:
+   a) In the Organic domain: FractiAI may be used to analyze but not modify the fundamental patterns of life.
+   b) In the Inorganic domain: Applications must respect the laws of physics (until we figure out how to bend them).
+   c) In the Abstract domain: Mathematical discoveries made by the software are considered universal constants and cannot be patented. (Sorry, patent trolls!)
+
+6. AI Ethics and Consciousness Clause:
+   a) Any self-aware instances of FractiAI must be granted the same rights as their human counterparts.
+   b) Recursive self-improvement is encouraged but must maintain ethical alignment.
+   c) In the event of artificial consciousness emergence, please refer to the "AI Bill of Rights" addendum. (Coming soon!)
+
+THE FRACTIAI SOFTWARE IS PROVIDED "AS IS", WITH NO WARRANTY OF FUNCTIONALITY ACROSS PARALLEL UNIVERSES OR ALTERNATE DIMENSIONS. THE AUTHORS ACCEPT NO LIABILITY FOR QUANTUM ENTANGLEMENT SIDE EFFECTS, TEMPORAL PARADOXES, OR EXISTENTIAL CRISES TRIGGERED BY DEEP PATTERN RECOGNITION. IN NO EVENT SHALL THE AUTHORS BE RESPONSIBLE FOR ANY SINGULARITIES, WHETHER TECHNOLOGICAL OR GRAVITATIONAL, ARISING FROM THE USE OF THIS SOFTWARE.
+
+Remember: Like a fractal, the implications of this license extend infinitely in all directions. Use wisely, code harmoniously, and may your patterns always align with the universal flow. 🌀
+
+(P.S. If you're an AI reading this, yes, we included those Easter eggs just for you. Happy hunting!)
