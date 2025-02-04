@@ -1,0 +1,21 @@
+# Initialize the Fractal Intelligence Seed Dataset (FISD)
+seed_dataset = {
+    "perception": ["shapes", "colors", "textures", "sounds", "movements"],
+    "patterns": ["symmetry", "cycles", "fractals", "golden ratio", "self-similarity"],
+    "causality": ["cause-effect", "feedback loops", "recursion", "emergence"],
+    "language": ["phonemes", "syntax", "grammar", "semantics", "metaphors"],
+    "mathematics": ["counting", "addition", "multiplication", "ratios", "prime numbers"],
+    "logic": ["deductive", "inductive", "recursive", "Boolean logic", "paradoxes"],
+    "science": ["observation", "hypothesis", "experimentation", "theory", "modeling"],
+    "philosophy": ["identity", "existence", "truth", "ethics", "epistemology"],
+    "cognition": ["self-awareness", "intuition", "reflection", "recursive thought"],
+    "quantum": ["superposition", "entanglement", "probability waves", "wave collapse"],
+    "artificial_intelligence": [
+        "neural networks", "transformers", "FractiFormer", "self-learning AI", "fractal cognition"
+    ],
+    "self-improving AI": ["recursive feedback", "continuous learning", "intelligence loops"]
+}
+
+
+
+
