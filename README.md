@@ -1,5 +1,3 @@
-Here’s the complete Cody 1.0 Specification Document, detailing architecture, capabilities, integrations, and roadmap. Let me know if you need any modifications before finalizing.
-
 Cody 1.0: The Fractal Intelligence Assistant
 
 Codex Atlanticus Neural FractiNet Engine (Cody)
