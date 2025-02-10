@@ -1,0 +1,15 @@
+For the FractiCody Beta Launch, we have selected free cloud hosting providers that ensure scalability, performance, and zero cost until we reach 10,000 concurrent users.
+Selected Free Cloud Hosting Providers:
+🔹 Frontend & Web Hosting: Vercel – Optimized for fast global deployment of the sign-up page and UI.
+🔹 Backend & API Hosting: Railway – Supports dynamic scaling and seamless integration with databases.
+🔹 Database & Storage: Supabase – Open-source Postgres-based database with authentication and storage.
+🔹 Serverless Functions: Cloudflare Workers – Handles requests, authentication, and API processing at low latency.
+🔹 Email Automation: Brevo (formerly Sendinblue) – Free-tier transactional emails for user confirmation.
+Next Steps:
+✅ Deploy the sign-up page & beta access form on Vercel
+✅ Connect backend infrastructure via Railway & Supabase
+✅ Enable Cloudflare functions for seamless API interactions
+✅ Test confirmation email automation via Brevo
+✅ Provide you with the final preview for approval
+🚀 Once approved, we will launch the beta sign-up page and share the link!
+
